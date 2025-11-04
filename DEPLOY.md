@@ -17,19 +17,41 @@ sudo ./troubleshoot.sh
 
 ## 🔧 推荐版本（已测试）
 
+### Python 3.6 兼容版本
+
+**重要：** Python 3.6 需要使用特定版本以避免兼容性问题：
+
+```
+Flask==2.0.3
+Flask-CORS>=3.0.0
+Flask-SQLAlchemy==2.5.1
+Flask-SocketIO==5.3.2
+python-socketio==5.7.2
+python-engineio==4.3.4
+paramiko>=2.7.0
+Werkzeug==2.0.3
+SQLAlchemy==1.4.46
+click==8.0.4
+itsdangerous==2.0.1
+Jinja2==3.0.3
+MarkupSafe==2.0.1
+```
+
+### Python 3.7+ 推荐版本
+
 ```
 Flask==2.3.3
 Flask-CORS>=3.0.0
 Flask-SQLAlchemy==2.5.1
-Flask-SocketIO>=5.0.0
-python-socketio>=5.0.0
-python-engineio>=4.0.0
+Flask-SocketIO>=5.0.0,<6.0.0
+python-socketio>=5.0.0,<6.0.0
+python-engineio>=4.0.0,<5.0.0
 paramiko>=2.7.0
 Werkzeug==2.3.7
 SQLAlchemy==1.4.54
 ```
 
-**此版本组合兼容 Python 3.6-3.13，在生产环境中稳定运行。**
+**注意：** `deploy.sh` 脚本会自动检测 Python 版本并安装对应的兼容版本。
 
 ## 🚀 部署方式
 
@@ -64,6 +86,13 @@ source .venv/bin/activate
 
 #### 2. 安装依赖（使用国内镜像）
 
+**Python 3.6 用户**：
+```bash
+chmod +x install-py36.sh
+./install-py36.sh
+```
+
+**Python 3.7+ 用户**：
 ```bash
 pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 ```
@@ -121,7 +150,38 @@ python3 app.py
 - 端口被占用
 - 文件权限问题
 
-### 2. ModuleNotFoundError
+### 2. Flask-SocketIO 版本冲突（Python 3.6）
+
+**错误**: `AttributeError: type object 'Server' has no attribute 'reason'`
+
+**原因**: Python 3.6 需要特定版本的 Flask-SocketIO 和 python-socketio
+
+**解决**:
+```bash
+cd /opt/device-manager
+source .venv/bin/activate
+
+# 卸载冲突的包
+pip3 uninstall -y Flask-SocketIO python-socketio python-engineio
+
+# 安装 Python 3.6 兼容版本
+pip3 install -i https://mirrors.aliyun.com/pypi/simple/ \
+    'python-engineio==4.3.4' \
+    'python-socketio==5.7.2' \
+    'Flask-SocketIO==5.3.2'
+
+sudo systemctl restart device-manager
+```
+
+或使用自动安装脚本：
+```bash
+cd /opt/device-manager
+source .venv/bin/activate
+bash install-py36.sh
+sudo systemctl restart device-manager
+```
+
+### 3. ModuleNotFoundError
 
 **错误**: `ModuleNotFoundError: No module named 'flask'`
 
@@ -133,7 +193,7 @@ pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 sudo systemctl restart device-manager
 ```
 
-### 3. SQLAlchemy 版本冲突
+### 4. SQLAlchemy 版本冲突
 
 **错误**: `AttributeError: module 'sqlalchemy' has no attribute '__all__'`
 

@@ -242,20 +242,65 @@ install_python_deps() {
     
     cd "$DEPLOY_DIR"
     
+    # 检测 Python 版本
+    PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
+    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+    log_info "检测到 Python 版本: $PYTHON_VERSION"
+    
     # 创建虚拟环境
     python3 -m venv .venv
     source .venv/bin/activate
     
     # 升级pip
-    pip3 install --upgrade pip
+    python3 -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/
     
-    # 安装依赖
-    if [ -f "requirements.txt" ]; then
-        pip3 install -r requirements.txt
-        log_info "Python依赖安装完成"
+    # 根据 Python 版本安装依赖
+    if [ "$PYTHON_MINOR" -eq 6 ]; then
+        log_warn "检测到 Python 3.6，安装兼容版本..."
+        
+        # Python 3.6 需要特定版本
+        python3 -m pip install -i https://mirrors.aliyun.com/pypi/simple/ \
+            'Flask==2.0.3' \
+            'Flask-CORS>=3.0.0' \
+            'Werkzeug==2.0.3' \
+            'click==8.0.4' \
+            'itsdangerous==2.0.1' \
+            'Jinja2==3.0.3' \
+            'MarkupSafe==2.0.1' \
+            'importlib-metadata>=4.0.0' \
+            'Flask-SQLAlchemy==2.5.1' \
+            'SQLAlchemy==1.4.46' \
+            'python-engineio==4.3.4' \
+            'python-socketio==5.7.2' \
+            'Flask-SocketIO==5.3.2' \
+            'paramiko>=2.7.0'
+        
+        log_info "Python 3.6 兼容版本安装完成"
     else
-        log_warn "requirements.txt不存在，跳过依赖安装"
+        log_info "安装推荐版本..."
+        
+        # Python 3.7+ 可以使用较新版本
+        if [ -f "requirements.txt" ]; then
+            python3 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+        else
+            python3 -m pip install -i https://mirrors.aliyun.com/pypi/simple/ \
+                'Flask>=2.0.0,<3.0.0' \
+                'Flask-CORS>=3.0.0' \
+                'Werkzeug>=2.0.0,<3.0.0' \
+                'Flask-SQLAlchemy>=2.5.0,<3.0.0' \
+                'SQLAlchemy>=1.4.0,<2.0.0' \
+                'python-engineio>=4.0.0,<5.0.0' \
+                'python-socketio>=5.0.0,<6.0.0' \
+                'Flask-SocketIO>=5.0.0,<6.0.0' \
+                'paramiko>=2.7.0'
+        fi
+        
+        log_info "Python依赖安装完成"
     fi
+    
+    # 显示安装的版本
+    log_info "已安装的关键包版本："
+    python3 -m pip list | grep -E "Flask|SQLAlchemy|Werkzeug|socketio|paramiko" || true
     
     deactivate
 }

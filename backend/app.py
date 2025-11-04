@@ -3,13 +3,23 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from datetime import datetime
 import os
+import sys
 import json
 from models import db, Device, User, UsageRecord, AllowedUser
 from terminal import TerminalManager
 
 # 读取配置文件
 basedir = os.path.abspath(os.path.dirname(__file__))
-config_path = os.path.join(os.path.dirname(basedir), 'config.json')
+project_root = os.path.dirname(basedir)
+config_path = os.path.join(project_root, 'config.json')
+
+print(f"========== 设备管理系统启动 ==========")
+print(f"Python版本: {sys.version}")
+print(f"当前目录: {os.getcwd()}")
+print(f"backend目录: {basedir}")
+print(f"项目根目录: {project_root}")
+print(f"配置文件路径: {config_path}")
+print(f"配置文件存在: {os.path.exists(config_path)}")
 
 # 默认配置
 DEFAULT_CONFIG = {
@@ -26,9 +36,11 @@ try:
         print(f"✅ 已加载配置文件: {config_path}")
 except FileNotFoundError:
     CONFIG = DEFAULT_CONFIG
-    print(f"⚠️ 配置文件不存在，使用默认配置")
+    print(f"⚠️ 配置文件不存在: {config_path}")
+    print(f"⚠️ 使用默认配置")
     # 创建默认配置文件
     try:
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
         with open(config_path, 'w', encoding='utf-8') as f:
             json.dump(DEFAULT_CONFIG, f, indent=2, ensure_ascii=False)
         print(f"✅ 已创建默认配置文件: {config_path}")
@@ -36,10 +48,18 @@ except FileNotFoundError:
         print(f"❌ 创建配置文件失败: {e}")
 except Exception as e:
     CONFIG = DEFAULT_CONFIG
-    print(f"❌ 读取配置文件失败: {e}，使用默认配置")
+    print(f"❌ 读取配置文件失败: {e}")
+    print(f"使用默认配置")
 
-app = Flask(__name__, static_folder='../frontend', static_url_path='')
+print(f"初始化Flask应用...")
+static_folder = os.path.join(project_root, 'frontend')
+print(f"静态文件目录: {static_folder}")
+print(f"静态文件目录存在: {os.path.exists(static_folder)}")
+
+app = Flask(__name__, static_folder=static_folder, static_url_path='')
 CORS(app, resources={r"/*": {"origins": "*"}})
+
+print(f"初始化SocketIO...")
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*",
@@ -52,27 +72,56 @@ socketio = SocketIO(
 )
 
 # 创建终端管理器
+print(f"初始化终端管理器...")
 terminal_manager = TerminalManager(socketio)
 
 # 配置数据库
-db_path = os.path.join(os.path.dirname(basedir), CONFIG['database']['path'])
+db_path = os.path.join(project_root, CONFIG['database']['path'])
+print(f"数据库路径: {db_path}")
+print(f"数据库目录: {os.path.dirname(db_path)}")
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + db_path
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # 初始化数据库
-db.init_app(app)
+print(f"初始化数据库...")
+try:
+    db.init_app(app)
+    print(f"✅ 数据库连接初始化成功")
+except Exception as e:
+    print(f"❌ 数据库连接初始化失败: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
 
 # 创建数据库表
-with app.app_context():
-    db.create_all()
-    # 创建默认管理员用户
-    admin_username = CONFIG['admin']['username']
-    admin_password = CONFIG['admin']['password']
-    admin = User.query.filter_by(username=admin_username).first()
-    if not admin:
-        admin = User(username=admin_username, password=admin_password, is_admin=True)
-        db.session.add(admin)
-        db.session.commit()
+print(f"创建数据库表...")
+try:
+    with app.app_context():
+        db.create_all()
+        print(f"✅ 数据库表创建成功")
+        
+        # 创建默认管理员用户
+        print(f"检查管理员用户...")
+        admin_username = CONFIG['admin']['username']
+        admin_password = CONFIG['admin']['password']
+        admin = User.query.filter_by(username=admin_username).first()
+        if not admin:
+            admin = User(username=admin_username, password=admin_password, is_admin=True)
+            db.session.add(admin)
+            db.session.commit()
+            print(f"✅ 创建管理员用户: {admin_username}")
+        else:
+            print(f"✅ 管理员用户已存在: {admin_username}")
+except Exception as e:
+    print(f"❌ 数据库表创建失败: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+print(f"✅ 所有初始化完成")
+print(f"{'='*40}\n")
 
 # ==================== 辅助函数 ====================
 
@@ -831,20 +880,31 @@ def handle_upload_file(data):
         })
 
 if __name__ == '__main__':
-    # 从配置文件读取服务器配置
-    server_config = CONFIG['server']
-    print(f"\n{'='*50}")
-    print(f"🚀 启动设备管理系统")
-    print(f"{'='*50}")
-    print(f"📍 主机: {server_config['host']}")
-    print(f"📍 端口: {server_config['port']}")
-    print(f"👤 管理员: {CONFIG['admin']['username']}")
-    print(f"{'='*50}\n")
-    
-    socketio.run(
-        app, 
-        debug=server_config['debug'], 
-        host=server_config['host'], 
-        port=server_config['port'], 
-        allow_unsafe_werkzeug=True
-    )
+    try:
+        # 从配置文件读取服务器配置
+        server_config = CONFIG['server']
+        print(f"\n{'='*50}")
+        print(f"🚀 启动设备管理系统")
+        print(f"{'='*50}")
+        print(f"📍 主机: {server_config['host']}")
+        print(f"📍 端口: {server_config['port']}")
+        print(f"👤 管理员: {CONFIG['admin']['username']}")
+        print(f"{'='*50}\n")
+        
+        socketio.run(
+            app, 
+            debug=server_config['debug'], 
+            host=server_config['host'], 
+            port=server_config['port'], 
+            allow_unsafe_werkzeug=True
+        )
+    except Exception as e:
+        import traceback
+        print(f"\n{'='*50}")
+        print(f"❌ 启动失败")
+        print(f"{'='*50}")
+        print(f"错误信息: {e}")
+        print(f"\n详细错误:")
+        traceback.print_exc()
+        print(f"{'='*50}\n")
+        sys.exit(1)
