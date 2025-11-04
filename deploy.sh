@@ -298,8 +298,8 @@ Type=simple
 User=$USER
 WorkingDirectory=$DEPLOY_DIR/backend
 Environment="PATH=$DEPLOY_DIR/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-Environment="PYTHONPATH=$DEPLOY_DIR"
-ExecStart=$DEPLOY_DIR/.venv/bin/python3 app.py
+Environment="PYTHONPATH=$DEPLOY_DIR/backend"
+ExecStart=$DEPLOY_DIR/.venv/bin/python3 $DEPLOY_DIR/backend/app.py
 Restart=always
 RestartSec=10
 StandardOutput=journal
