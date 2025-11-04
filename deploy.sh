@@ -296,11 +296,15 @@ After=network.target
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=$DEPLOY_DIR
+WorkingDirectory=$DEPLOY_DIR/backend
 Environment="PATH=$DEPLOY_DIR/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=$DEPLOY_DIR/.venv/bin/python $DEPLOY_DIR/backend/app.py
+Environment="PYTHONPATH=$DEPLOY_DIR"
+ExecStart=$DEPLOY_DIR/.venv/bin/python3 app.py
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=device-manager
 
 [Install]
 WantedBy=multi-user.target
@@ -318,13 +322,23 @@ start_service() {
     log_step "启动服务..."
     
     $USE_SUDO systemctl start device-manager
-    sleep 3
+    sleep 5
     
     if $USE_SUDO systemctl is-active --quiet device-manager; then
         log_info "服务启动成功"
     else
         log_error "服务启动失败"
-        $USE_SUDO systemctl status device-manager
+        echo ""
+        echo "========== 服务状态 =========="
+        $USE_SUDO systemctl status device-manager --no-pager
+        echo ""
+        echo "========== 最近日志 =========="
+        $USE_SUDO journalctl -u device-manager -n 30 --no-pager
+        echo ""
+        log_error "请检查上述日志信息，常见问题："
+        echo "  1. 检查 Python 版本是否 >= 3.6"
+        echo "  2. 检查依赖是否正确安装: $DEPLOY_DIR/.venv/bin/pip3 list"
+        echo "  3. 手动测试启动: cd $DEPLOY_DIR/backend && $DEPLOY_DIR/.venv/bin/python3 app.py"
         exit 1
     fi
 }
