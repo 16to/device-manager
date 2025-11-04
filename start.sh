@@ -11,7 +11,17 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-echo "✅ Python3 已安装"
+# 检查Python版本 (需要 >= 3.6)
+PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
+PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 6 ]); then
+    echo "❌ 错误：Python版本过低 ($PYTHON_VERSION)，需要 Python 3.6 或更高版本"
+    exit 1
+fi
+
+echo "✅ Python3 已安装 ($PYTHON_VERSION)"
 
 # 检查虚拟环境是否存在
 if [ ! -d ".venv" ]; then
@@ -25,7 +35,7 @@ source .venv/bin/activate
 
 # 安装依赖
 echo "📥 安装Python依赖包..."
-pip3 install -q -r requirements.txt
+pip3 install -q -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 # 读取配置文件中的端口号
 PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])" 2>/dev/null || echo "3000")

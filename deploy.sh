@@ -76,6 +76,17 @@ install_python() {
     if command -v python3 &> /dev/null; then
         PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
         log_info "Python3已安装: $PYTHON_VERSION"
+        
+        # 检查Python版本是否 >= 3.6
+        PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+        PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+        
+        if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 6 ]); then
+            log_error "Python版本过低: $PYTHON_VERSION，需要 Python 3.6 或更高版本"
+            exit 1
+        fi
+        
+        log_info "Python版本检查通过 (需要 >= 3.6)"
         return 0
     fi
     
@@ -236,11 +247,11 @@ install_python_deps() {
     source .venv/bin/activate
     
     # 升级pip
-    pip3 install --upgrade pip -q
+    pip3 install --upgrade pip
     
     # 安装依赖
     if [ -f "requirements.txt" ]; then
-        pip3 install -r requirements.txt -q
+        pip3 install -r requirements.txt
         log_info "Python依赖安装完成"
     else
         log_warn "requirements.txt不存在，跳过依赖安装"

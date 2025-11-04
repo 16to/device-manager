@@ -18,8 +18,8 @@
 ## 🚀 快速开始
 
 ### 前置要求
-- Python 3.7 或更高版本
-- pip（Python包管理器）
+- Python 3.6 或更高版本
+- pip3（Python包管理器）
 
 ### 安装和启动
 
@@ -32,11 +32,11 @@ chmod +x start.sh
 2. **手动启动**
 ```bash
 # 安装依赖
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
 # 启动服务
 cd backend
-python app.py
+python3 app.py
 ```
 
 3. **访问系统**
