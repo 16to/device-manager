@@ -11,17 +11,17 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# 检查Python版本 (需要 >= 3.6)
-PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
+# 检查 Python 版本
+PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
 PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
 
-if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 6 ]); then
-    echo "❌ 错误：Python版本过低 ($PYTHON_VERSION)，需要 Python 3.6 或更高版本"
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
+    echo "❌ 错误：Python版本过低 ($PYTHON_VERSION)，需要 Python 3.8 或更高版本"
     exit 1
 fi
 
-echo "✅ Python3 已安装 ($PYTHON_VERSION)"
+echo "✅ Python版本检查通过: $PYTHON_VERSION"
 
 # 检查虚拟环境是否存在
 if [ ! -d ".venv" ]; then

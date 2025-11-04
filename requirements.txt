@@ -1,9 +1,9 @@
 Flask>=2.0.0,<3.0.0
 Flask-CORS>=3.0.0
 Flask-SQLAlchemy>=2.5.0,<3.0.0
-Flask-SocketIO>=5.0.0,<6.0.0
-python-socketio>=5.0.0,<6.0.0
-python-engineio>=4.0.0,<5.0.0
+Flask-SocketIO>=5.0.0
+python-socketio>=5.0.0
+python-engineio>=4.0.0
 paramiko>=2.7.0
 Werkzeug>=2.0.0,<3.0.0
 SQLAlchemy>=1.4.0,<2.0.0

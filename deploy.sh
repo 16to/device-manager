@@ -77,16 +77,16 @@ install_python() {
         PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
         log_info "Python3已安装: $PYTHON_VERSION"
         
-        # 检查Python版本是否 >= 3.6
+        # 检查Python版本是否 >= 3.8
         PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
         PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
         
-        if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 6 ]); then
-            log_error "Python版本过低: $PYTHON_VERSION，需要 Python 3.6 或更高版本"
+        if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
+            log_error "Python版本过低: $PYTHON_VERSION，需要 Python 3.8 或更高版本"
             exit 1
         fi
         
-        log_info "Python版本检查通过 (需要 >= 3.6)"
+        log_info "Python版本检查通过 (需要 >= 3.8)"
         return 0
     fi
     
@@ -244,7 +244,6 @@ install_python_deps() {
     
     # 检测 Python 版本
     PYTHON_VERSION=$(python3 --version 2>&1 | cut -d' ' -f2)
-    PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
     log_info "检测到 Python 版本: $PYTHON_VERSION"
     
     # 创建虚拟环境
@@ -254,49 +253,24 @@ install_python_deps() {
     # 升级pip
     python3 -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/
     
-    # 根据 Python 版本安装依赖
-    if [ "$PYTHON_MINOR" -eq 6 ]; then
-        log_warn "检测到 Python 3.6，安装兼容版本..."
-        
-        # Python 3.6 需要特定版本
-        python3 -m pip install -i https://mirrors.aliyun.com/pypi/simple/ \
-            'Flask==2.0.3' \
-            'Flask-CORS>=3.0.0' \
-            'Werkzeug==2.0.3' \
-            'click==8.0.4' \
-            'itsdangerous==2.0.1' \
-            'Jinja2==3.0.3' \
-            'MarkupSafe==2.0.1' \
-            'importlib-metadata>=4.0.0' \
-            'Flask-SQLAlchemy==2.5.1' \
-            'SQLAlchemy==1.4.46' \
-            'python-engineio==4.3.4' \
-            'python-socketio==5.7.2' \
-            'Flask-SocketIO==5.3.2' \
-            'paramiko>=2.7.0'
-        
-        log_info "Python 3.6 兼容版本安装完成"
+    # 安装依赖
+    log_info "安装Python依赖包..."
+    if [ -f "requirements.txt" ]; then
+        python3 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
     else
-        log_info "安装推荐版本..."
-        
-        # Python 3.7+ 可以使用较新版本
-        if [ -f "requirements.txt" ]; then
-            python3 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-        else
-            python3 -m pip install -i https://mirrors.aliyun.com/pypi/simple/ \
-                'Flask>=2.0.0,<3.0.0' \
-                'Flask-CORS>=3.0.0' \
-                'Werkzeug>=2.0.0,<3.0.0' \
-                'Flask-SQLAlchemy>=2.5.0,<3.0.0' \
-                'SQLAlchemy>=1.4.0,<2.0.0' \
-                'python-engineio>=4.0.0,<5.0.0' \
-                'python-socketio>=5.0.0,<6.0.0' \
-                'Flask-SocketIO>=5.0.0,<6.0.0' \
-                'paramiko>=2.7.0'
-        fi
-        
-        log_info "Python依赖安装完成"
+        python3 -m pip install -i https://mirrors.aliyun.com/pypi/simple/ \
+            'Flask>=2.0.0,<3.0.0' \
+            'Flask-CORS>=3.0.0' \
+            'Werkzeug>=2.0.0,<3.0.0' \
+            'Flask-SQLAlchemy>=2.5.0,<3.0.0' \
+            'SQLAlchemy>=1.4.0,<2.0.0' \
+            'Flask-SocketIO>=5.0.0' \
+            'python-socketio>=5.0.0' \
+            'python-engineio>=4.0.0' \
+            'paramiko>=2.7.0'
     fi
+    
+    log_info "Python依赖安装完成"
     
     # 显示安装的版本
     log_info "已安装的关键包版本："
