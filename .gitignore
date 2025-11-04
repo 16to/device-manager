@@ -33,7 +33,6 @@ env/
 *.db-journal
 *.db-shm
 *.db-wal
-backend/device_manager.db*
 
 # IDE
 .vscode/
