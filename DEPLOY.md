@@ -1,14 +1,5 @@
 # 🚀 部署指南
 
-## 快速修复服务启动失败
-
-如果部署后服务启动失败，运行故障排查脚本：
-
-```bash
-chmod +x troubleshoot.sh
-sudo ./troubleshoot.sh
-```
-
 ## 📦 环境要求
 
 - **Python 版本**: Python 3.8 或更高版本
@@ -40,6 +31,16 @@ chmod +x deploy.sh
 sudo ./deploy.sh
 ```
 
+**部署过程说明：**
+1. 检查系统环境和依赖
+2. 复制项目文件（自动排除数据库文件）
+3. 创建虚拟环境并安装依赖
+4. 创建配置文件（config.json）
+5. 创建 systemd 服务
+6. 启动服务
+
+**重要：** 部署脚本会自动创建全新的空数据库，不会复制开发环境的数据库文件。
+
 部署完成后，服务会自动启动。如果失败：
 
 ```bash
@@ -48,9 +49,6 @@ sudo systemctl status device-manager
 
 # 查看日志
 sudo journalctl -u device-manager -n 50
-
-# 运行故障排查
-sudo ./troubleshoot.sh
 ```
 
 ### 方式二：手动部署
@@ -93,6 +91,36 @@ cd backend
 python3 app.py
 ```
 
+**首次启动会自动创建空数据库和默认管理员账号。**
+
+## 🗄️ 数据库说明
+
+### 数据库初始化
+
+- 系统使用 SQLite 数据库
+- 数据库文件路径：`backend/device_manager.db`
+- **首次运行会自动创建空数据库**
+- 自动创建所有必要的表结构
+- 自动创建默认管理员账号（从 config.json 读取）
+
+### 数据库文件管理
+
+- 数据库文件已添加到 `.gitignore`，不会被提交到代码库
+- `deploy.sh` 部署时会自动排除数据库文件
+- 每次部署都会创建全新的空数据库
+- 如需保留数据，请在部署前手动备份数据库文件
+
+### 数据备份
+
+```bash
+# 备份数据库
+cp backend/device_manager.db ~/backup/device_manager_$(date +%Y%m%d).db
+
+# 恢复数据库
+cp ~/backup/device_manager_20250104.db backend/device_manager.db
+sudo systemctl restart device-manager
+```
+
 ## 🐛 常见问题解决
 
 ### 1. 服务启动失败（systemd）
@@ -102,13 +130,10 @@ python3 app.py
 **排查步骤**:
 
 ```bash
-# 1. 运行故障排查脚本
-sudo ./troubleshoot.sh
-
-# 2. 查看详细日志
+# 1. 查看详细日志
 sudo journalctl -u device-manager -n 100 --no-pager
 
-# 3. 手动测试
+# 2. 手动测试
 cd /opt/device-manager/backend
 source /opt/device-manager/.venv/bin/activate
 python3 app.py
@@ -176,7 +201,39 @@ sudo chown -R $USER:$USER /opt/device-manager
 sudo chmod +x /opt/device-manager/.venv/bin/python3
 ```
 
-## 📊 服务管理命令
+### 6. 数据库表不存在
+
+**错误**: `no such table: device` 或类似错误
+
+**原因**: 数据库文件损坏或未正确初始化
+
+**解决**:
+```bash
+cd /opt/device-manager/backend
+
+# 备份旧数据库（如果需要）
+mv device_manager.db device_manager.db.old
+
+# 删除数据库文件，让系统重新创建
+rm -f device_manager.db*
+
+# 重启服务（会自动创建新数据库）
+sudo systemctl restart device-manager
+```
+
+### 7. 数据库被意外保留
+
+**问题**: 部署后发现有旧数据
+
+**解决**:
+```bash
+cd /opt/device-manager/backend
+sudo systemctl stop device-manager
+rm -f device_manager.db*
+sudo systemctl start device-manager
+```
+
+## 🔧 服务管理命令
 
 ```bash
 # 启动服务
@@ -191,76 +248,60 @@ sudo systemctl restart device-manager
 # 查看状态
 sudo systemctl status device-manager
 
-# 查看实时日志
+# 查看日志
 sudo journalctl -u device-manager -f
 
-# 查看最近50行日志
+# 查看最近日志
 sudo journalctl -u device-manager -n 50
 
-# 开机自启
-sudo systemctl enable device-manager
-
-# 禁用自启
+# 禁用开机自启
 sudo systemctl disable device-manager
+
+# 启用开机自启
+sudo systemctl enable device-manager
 ```
 
-## 🔍 手动测试步骤
+## 📊 手动测试
 
-如果 systemd 服务启动失败，按以下步骤手动测试：
+如果 systemd 服务启动失败，可以手动运行进行调试：
 
 ```bash
-# 1. 进入部署目录
-cd /opt/device-manager
+cd /opt/device-manager/backend
+source /opt/device-manager/.venv/bin/activate
 
-# 2. 激活虚拟环境
-source .venv/bin/activate
-
-# 3. 检查 Python 版本
+# 检查 Python 版本
 python3 --version
 
-# 4. 检查依赖包
-pip3 list | grep -E "Flask|SQLAlchemy"
+# 检查依赖包
+pip3 list | grep -E "Flask|SQLAlchemy|socketio"
 
-# 5. 测试配置文件
-python3 -c "import json; print(json.load(open('config.json')))"
-
-# 6. 进入后端目录
-cd backend
-
-# 7. 尝试启动
+# 手动启动（会显示详细错误信息）
 python3 app.py
 ```
 
-如果手动启动成功，但 systemd 失败，检查：
-- systemd 服务文件: `/etc/systemd/system/device-manager.service`
-- 工作目录和路径是否正确
-- 用户权限是否足够
+## 🌐 生产环境建议
 
-## 🔐 生产环境建议
-
-### 1. 使用 Gunicorn
+### 1. 使用 Gunicorn + Nginx
 
 ```bash
-# 安装
-pip3 install gunicorn
+# 安装 Gunicorn
+pip3 install gunicorn eventlet
 
-# 修改 systemd 服务
-sudo vi /etc/systemd/system/device-manager.service
+# 创建 Gunicorn 启动脚本
+cat > /opt/device-manager/start_gunicorn.sh << 'EOF'
+#!/bin/bash
+cd /opt/device-manager/backend
+source /opt/device-manager/.venv/bin/activate
+gunicorn --worker-class eventlet -w 1 -b 0.0.0.0:3000 app:app
+EOF
+
+chmod +x /opt/device-manager/start_gunicorn.sh
+
+# 配置 Nginx 反向代理
+sudo nano /etc/nginx/sites-available/device-manager
 ```
 
-修改 ExecStart 行：
-```ini
-ExecStart=/opt/device-manager/.venv/bin/gunicorn -w 4 -b 0.0.0.0:3000 --chdir /opt/device-manager/backend app:app
-```
-
-```bash
-# 重启服务
-sudo systemctl daemon-reload
-sudo systemctl restart device-manager
-```
-
-### 2. 配置 Nginx
-
+Nginx 配置示例：
 ```nginx
 server {
     listen 80;
@@ -268,97 +309,101 @@ server {
 
     location / {
         proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    location /socket.io {
-        proxy_pass http://127.0.0.1:3000/socket.io;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 ```
 
-### 3. 启用 HTTPS
+### 2. 配置 HTTPS
 
 ```bash
-sudo apt-get install certbot python3-certbot-nginx
+# 使用 Let's Encrypt
 sudo certbot --nginx -d your-domain.com
 ```
 
-### 4. 数据库备份
+### 3. 定期备份
 
 ```bash
 # 创建备份脚本
-cat > /opt/device-manager/backup.sh << 'EOF'
+cat > /opt/backup_device_manager.sh << 'EOF'
 #!/bin/bash
-BACKUP_DIR="/opt/device-manager/backups"
+BACKUP_DIR="/opt/backups/device-manager"
 mkdir -p $BACKUP_DIR
 cp /opt/device-manager/backend/device_manager.db \
    $BACKUP_DIR/device_manager_$(date +%Y%m%d_%H%M%S).db
-# 保留最近7天的备份
-find $BACKUP_DIR -name "*.db" -mtime +7 -delete
+# 保留最近30天的备份
+find $BACKUP_DIR -name "*.db" -mtime +30 -delete
 EOF
 
-chmod +x /opt/device-manager/backup.sh
+chmod +x /opt/backup_device_manager.sh
 
 # 添加到 crontab（每天凌晨2点备份）
-echo "0 2 * * * /opt/device-manager/backup.sh" | crontab -
+(crontab -l 2>/dev/null; echo "0 2 * * * /opt/backup_device_manager.sh") | crontab -
 ```
 
-## 📞 故障排查工具
-
-系统提供了自动故障排查脚本：
+### 4. 监控和日志轮转
 
 ```bash
-sudo ./troubleshoot.sh [部署目录]
+# 配置日志轮转
+sudo cat > /etc/logrotate.d/device-manager << EOF
+/var/log/device-manager/*.log {
+    daily
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 0640 www-data www-data
+    sharedscripts
+    postrotate
+        systemctl reload device-manager > /dev/null 2>&1 || true
+    endscript
+}
+EOF
 ```
 
-该脚本会检查：
-- 服务状态
-- 系统日志
-- Python 版本
-- 依赖包
-- 配置文件
-- 文件权限
-- 端口占用
+## 📝 更新部署
 
-## 🎯 验证部署
+当有新版本时：
 
 ```bash
-# 检查服务是否运行
-curl http://localhost:3000
+# 1. 备份数据库
+sudo cp /opt/device-manager/backend/device_manager.db ~/backup_$(date +%Y%m%d).db
 
-# 测试 API
-curl http://localhost:3000/api/devices
-
-# 查看服务状态
-sudo systemctl status device-manager
-```
-
-## 📝 重新部署
-
-如需重新部署：
-
-```bash
-# 1. 停止服务
+# 2. 停止服务
 sudo systemctl stop device-manager
 
-# 2. 备份数据库
-cp /opt/device-manager/backend/device_manager.db /tmp/backup.db
+# 3. 拉取最新代码
+cd /path/to/source
+git pull
 
-# 3. 重新运行部署脚本
+# 4. 重新部署
 sudo ./deploy.sh
 
-# 4. 如需保留数据，恢复数据库
-cp /tmp/backup.db /opt/device-manager/backend/device_manager.db
+# 5. 恢复数据库（如果需要保留数据）
+sudo cp ~/backup_$(date +%Y%m%d).db /opt/device-manager/backend/device_manager.db
 
-# 5. 重启服务
+# 6. 重启服务
 sudo systemctl restart device-manager
 ```
 
+## 🔐 安全建议
+
+1. **修改默认密码**: 在 `config.json` 中修改管理员密码
+2. **使用 HTTPS**: 配置 SSL 证书
+3. **防火墙**: 只开放必要的端口
+4. **定期更新**: 保持系统和依赖包更新
+5. **备份**: 定期备份数据库文件
+6. **访问控制**: 使用 Nginx 添加 IP 白名单或基础认证
+
 ---
 
-**部署完成后，记得修改默认管理员密码！** 🔐
+**部署完成后访问**: http://your-server-ip:3000
+
+默认管理员账号：
+- 用户名：admin
+- 密码：admin123（请及时修改！）

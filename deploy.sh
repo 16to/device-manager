@@ -192,15 +192,21 @@ copy_files() {
     
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     
-    # 复制所有文件
-    cp -r "$SCRIPT_DIR"/* "$DEPLOY_DIR/" 2>/dev/null || true
+    # 复制所有文件（排除数据库文件）
+    rsync -av --exclude='*.db' --exclude='*.db-*' --exclude='.venv' --exclude='.git' \
+        "$SCRIPT_DIR"/ "$DEPLOY_DIR/" 2>/dev/null || \
+        cp -r "$SCRIPT_DIR"/* "$DEPLOY_DIR/" 2>/dev/null || true
+    
+    # 删除可能复制过来的数据库文件
+    rm -f "$DEPLOY_DIR/backend/*.db" 2>/dev/null || true
+    rm -f "$DEPLOY_DIR/backend/*.db-*" 2>/dev/null || true
     
     # 确保必要的目录存在
     mkdir -p "$DEPLOY_DIR/backend"
     mkdir -p "$DEPLOY_DIR/frontend"
     mkdir -p "$DEPLOY_DIR/frontend/static"
     
-    log_info "项目文件复制完成"
+    log_info "项目文件复制完成（已排除数据库文件）"
 }
 
 # 创建配置文件
