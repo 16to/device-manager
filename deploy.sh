@@ -236,11 +236,11 @@ install_python_deps() {
     source .venv/bin/activate
     
     # 升级pip
-    pip install --upgrade pip -q
+    pip3 install --upgrade pip -q
     
     # 安装依赖
     if [ -f "requirements.txt" ]; then
-        pip install -r requirements.txt -q
+        pip3 install -r requirements.txt -q
         log_info "Python依赖安装完成"
     else
         log_warn "requirements.txt不存在，跳过依赖安装"
