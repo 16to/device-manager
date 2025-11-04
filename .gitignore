@@ -28,12 +28,6 @@ venv/
 ENV/
 env/
 
-# Database
-*.db
-*.db-journal
-*.db-shm
-*.db-wal
-
 # IDE
 .vscode/
 .idea/

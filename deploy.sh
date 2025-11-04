@@ -192,21 +192,17 @@ copy_files() {
     
     SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
     
-    # 复制所有文件（排除数据库文件）
-    rsync -av --exclude='*.db' --exclude='*.db-*' --exclude='.venv' --exclude='.git' \
+    # 复制所有文件（排除虚拟环境和git目录）
+    rsync -av --exclude='.venv' --exclude='.git' --exclude='__pycache__' \
         "$SCRIPT_DIR"/ "$DEPLOY_DIR/" 2>/dev/null || \
         cp -r "$SCRIPT_DIR"/* "$DEPLOY_DIR/" 2>/dev/null || true
-    
-    # 删除可能复制过来的数据库文件
-    rm -f "$DEPLOY_DIR/backend/*.db" 2>/dev/null || true
-    rm -f "$DEPLOY_DIR/backend/*.db-*" 2>/dev/null || true
     
     # 确保必要的目录存在
     mkdir -p "$DEPLOY_DIR/backend"
     mkdir -p "$DEPLOY_DIR/frontend"
     mkdir -p "$DEPLOY_DIR/frontend/static"
     
-    log_info "项目文件复制完成（已排除数据库文件）"
+    log_info "项目文件复制完成"
 }
 
 # 创建配置文件
@@ -281,6 +277,15 @@ install_python_deps() {
     # 显示安装的版本
     log_info "已安装的关键包版本："
     python3 -m pip list | grep -E "Flask|SQLAlchemy|Werkzeug|socketio|paramiko" || true
+    
+    # 初始化数据库
+    log_step "初始化数据库..."
+    if [ -f "init_db.py" ]; then
+        python3 init_db.py
+        log_info "数据库初始化完成"
+    else
+        log_warn "init_db.py 不存在，跳过数据库初始化"
+    fi
     
     deactivate
 }
