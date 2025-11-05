@@ -1826,7 +1826,7 @@
                                 <select v-model="statusFilter" class="filter-select">
                                     <option value="">全部状态</option>
                                     <option value="available">空闲</option>
-                                    <option value="occupied">占用中</option>
+                                    <option value="occupied">占用</option>
                                 </select>
                             </div>
                             
@@ -1869,7 +1869,7 @@
                             <div class="device-header">
                                 <div class="device-name">{{ device.name }}</div>
                                 <span class="status-badge" :class="device.status">
-                                    {{ device.status === 'available' ? '空闲' : '占用中' }}
+                                    {{ device.status === 'available' ? '空闲' : '占用' }}
                                 </span>
                             </div>
                             
@@ -3535,7 +3535,7 @@
                         
                         return {
                             '设备名称': device.name,
-                            '状态': device.status === 'available' ? '空闲' : '占用中',
+                            '状态': device.status === 'available' ? '空闲' : '占用',
                             '使用者': device.current_user || '',
                             '使用者账号': device.current_user_account || '',
                             '用户名': device.username || '',
@@ -3563,7 +3563,7 @@
                     // 创建说明工作表
                     const instructions = [
                         { '字段名': '设备名称', '说明': '设备的唯一名称（必填）', '示例': 'iPhone 13 Pro' },
-                        { '字段名': '状态', '说明': '设备状态（导出时自动生成，导入时忽略）', '示例': '空闲 或 占用中' },
+                        { '字段名': '状态', '说明': '设备状态（导出时自动生成，导入时忽略）', '示例': '空闲 或 占用' },
                         { '字段名': '使用者', '说明': '当前使用者中文名（导出时自动生成，导入时忽略）', '示例': '张三' },
                         { '字段名': '使用者账号', '说明': '当前使用者账号（导出时自动生成，导入时忽略）', '示例': 'zhangsan' },
                         { '字段名': '用户名', '说明': '设备登录用户名（可选）', '示例': 'root' },
