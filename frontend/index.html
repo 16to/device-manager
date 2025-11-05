@@ -301,6 +301,13 @@
             transform: translateY(-50%);
             font-size: 14px;
         }
+        
+        /* title-stats-row 中的按钮样式优化 */
+        .title-stats-row .btn {
+            padding: 6px 12px;
+            font-size: 13px;
+            white-space: nowrap;
+        }
 
         .stats-filter-row {
             display: flex;
@@ -746,6 +753,27 @@
             border-color: #cbd5e0;
             box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
             transform: translateY(-4px);
+        }
+        
+        .device-card.selected {
+            border: 3px solid #667eea !important;
+            background: #f7faff;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+        
+        .device-checkbox {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+            cursor: pointer;
+        }
+        
+        .device-checkbox input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #667eea;
         }
 
         .device-card.available {
@@ -1810,12 +1838,30 @@
                                 </div>
                             </div>
                             
-                            <div style="display: flex; gap: 10px;">
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                 <button v-if="isLoggedIn && currentUser.is_admin" class="btn btn-primary" @click="showAddDeviceModal">➕ 添加设备</button>
                                 <button v-if="isLoggedIn && currentUser.is_admin" class="btn btn-secondary" @click="exportDevicesToExcel">📥 导出Excel</button>
                                 <button v-if="isLoggedIn && currentUser.is_admin" class="btn btn-secondary" @click="triggerDeviceExcelUpload">📤 导入Excel</button>
                                 <button v-if="isLoggedIn && currentUser.is_admin" class="btn" style="background: #48bb78; color: white;" @click="downloadDeviceExcelTemplate">📄 下载模板</button>
                                 <input type="file" ref="deviceExcelInput" @change="handleDeviceExcelUpload" accept=".xlsx,.xls" style="display: none;">
+                                
+                                <!-- 批量删除按钮 -->
+                                <div v-if="isLoggedIn && currentUser.is_admin" style="display: flex; gap: 10px; margin-left: auto;">
+                                    <button v-if="!bulkDeleteMode" class="btn" style="background: #f56565; color: white;" @click="toggleBulkDeleteMode">
+                                        🗑️ 批量删除
+                                    </button>
+                                    <template v-else>
+                                        <button class="btn" style="background: #667eea; color: white;" @click="selectAllDevices">
+                                            {{ selectedDeviceIds.length === filteredDevices.length ? '取消全选' : '全选' }}
+                                        </button>
+                                        <button class="btn" style="background: #f56565; color: white;" @click="batchDeleteDevices" :disabled="selectedDeviceIds.length === 0">
+                                            🗑️ 删除选中 ({{ selectedDeviceIds.length }})
+                                        </button>
+                                        <button class="btn btn-secondary" @click="toggleBulkDeleteMode">
+                                            取消
+                                        </button>
+                                    </template>
+                                </div>
                             </div>
                         </div>
                         
@@ -1865,7 +1911,12 @@
                     <div v-else class="devices-grid">
                         <div v-for="device in filteredDevices" :key="device.id" 
                              class="device-card" 
-                             :class="device.status">
+                             :class="[device.status, { 'selected': bulkDeleteMode && selectedDeviceIds.includes(device.id) }]">
+                            <!-- 批量删除模式下的复选框 -->
+                            <div v-if="isLoggedIn && currentUser.is_admin && bulkDeleteMode" class="device-checkbox" @click.stop="toggleDeviceSelection(device.id)">
+                                <input type="checkbox" :checked="selectedDeviceIds.includes(device.id)" @click.stop>
+                            </div>
+                            
                             <div class="device-header">
                                 <div class="device-name">{{ device.name }}</div>
                                 <span class="status-badge" :class="device.status">
@@ -2497,6 +2548,10 @@
                     // 用户管理
                     allowedUsers: [],
                     selectedUsers: [],
+                    
+                    // 批量删除设备
+                    selectedDeviceIds: [],
+                    bulkDeleteMode: false,
                     showAddUserModal: false,
                     newUserForm: {
                         account: '',
@@ -3216,6 +3271,56 @@
                     } catch (error) {
                         this.showMessage('删除失败', error.message, 'error');
                     }
+                },
+                
+                // 批量删除相关方法
+                toggleBulkDeleteMode() {
+                    this.bulkDeleteMode = !this.bulkDeleteMode;
+                    if (!this.bulkDeleteMode) {
+                        this.selectedDeviceIds = [];
+                    }
+                },
+                
+                toggleDeviceSelection(deviceId) {
+                    const index = this.selectedDeviceIds.indexOf(deviceId);
+                    if (index > -1) {
+                        this.selectedDeviceIds.splice(index, 1);
+                    } else {
+                        this.selectedDeviceIds.push(deviceId);
+                    }
+                },
+                
+                selectAllDevices() {
+                    if (this.selectedDeviceIds.length === this.filteredDevices.length) {
+                        this.selectedDeviceIds = [];
+                    } else {
+                        this.selectedDeviceIds = this.filteredDevices.map(d => d.id);
+                    }
+                },
+                
+                async batchDeleteDevices() {
+                    if (this.selectedDeviceIds.length === 0) {
+                        this.showMessage('提示', '请先选择要删除的设备', 'warning');
+                        return;
+                    }
+                    
+                    this.confirmAction(
+                        '批量删除设备',
+                        `确定要删除选中的 ${this.selectedDeviceIds.length} 台设备吗？此操作不可恢复！`,
+                        async () => {
+                            try {
+                                const response = await axios.post(`${this.apiBaseUrl}/devices/batch-delete`, {
+                                    device_ids: this.selectedDeviceIds
+                                });
+                                this.showMessage('删除成功', response.data.message, 'success');
+                                this.selectedDeviceIds = [];
+                                this.bulkDeleteMode = false;
+                                this.loadAllData();
+                            } catch (error) {
+                                this.showMessage('删除失败', error.response?.data?.message || error.message, 'error');
+                            }
+                        }
+                    );
                 },
                 
                 showOccupyModal(device) {

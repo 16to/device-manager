@@ -338,6 +338,34 @@ def delete_device(device_id):
     db.session.commit()
     return jsonify({'message': '设备删除成功'})
 
+@app.route('/api/devices/batch-delete', methods=['POST'])
+def batch_delete_devices():
+    """批量删除设备"""
+    data = request.json
+    device_ids = data.get('device_ids', [])
+    
+    if not device_ids:
+        return jsonify({'message': '没有要删除的设备'}), 400
+    
+    if not isinstance(device_ids, list):
+        return jsonify({'message': '参数格式错误'}), 400
+    
+    try:
+        # 先删除这些设备的所有使用记录
+        UsageRecord.query.filter(UsageRecord.device_id.in_(device_ids)).delete(synchronize_session=False)
+        
+        # 再批量删除设备
+        deleted_count = Device.query.filter(Device.id.in_(device_ids)).delete(synchronize_session=False)
+        
+        db.session.commit()
+        return jsonify({
+            'message': f'成功删除 {deleted_count} 台设备',
+            'deleted_count': deleted_count
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'删除失败: {str(e)}'}), 500
+
 @app.route('/api/devices/batch-import', methods=['POST'])
 def batch_import_devices():
     """批量导入设备"""
