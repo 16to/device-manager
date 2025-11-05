@@ -1762,7 +1762,7 @@
                         <span>{{ connectionStatus === 'online' ? '已连接' : (connectionStatus === 'offline' ? '未连接' : '检查中...') }}</span>
                     </div>
                     <div class="user-info" v-if="isLoggedIn">
-                        <span>👤 {{ currentUser.username }}</span>
+                        <span>👤 {{ currentUser.chinese_name || currentUser.username }} ({{ currentUser.username }})</span>
                         <span v-if="currentUser.is_admin" style="color: #667eea; font-weight: bold;">管理员</span>
                     </div>
                     <div class="nav-tabs">
