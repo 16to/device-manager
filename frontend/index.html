@@ -2354,6 +2354,7 @@
                 <div class="form-group">
                     <label>占用时长 *</label>
                     <select v-model="occupyForm.duration" class="filter-select" style="width: 100%;">
+                        <option :value="0.5">0.5小时</option>
                         <option :value="1">1小时</option>
                         <option :value="2">2小时（默认）</option>
                         <option :value="4">4小时</option>
