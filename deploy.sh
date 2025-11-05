@@ -414,11 +414,15 @@ start_service() {
 
 # 获取服务器IP
 get_server_ip() {
-    # 尝试获取公网IP
-    PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || curl -s icanhazip.com 2>/dev/null || echo "")
+    # 尝试获取公网IP（设置3秒超时）
+    PUBLIC_IP=$(curl -s --connect-timeout 3 --max-time 5 ifconfig.me 2>/dev/null || \
+                curl -s --connect-timeout 3 --max-time 5 icanhazip.com 2>/dev/null || \
+                echo "")
     
     # 获取内网IP
-    LOCAL_IP=$(hostname -I | awk '{print $1}')
+    LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || \
+               ip addr show | grep 'inet ' | grep -v '127.0.0.1' | head -1 | awk '{print $2}' | cut -d/ -f1 || \
+               echo "127.0.0.1")
     
     if [ -n "$PUBLIC_IP" ]; then
         SERVER_IP=$PUBLIC_IP
