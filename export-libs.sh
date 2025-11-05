@@ -50,9 +50,13 @@ echo "导出依赖包到 libs/ 目录..."
 echo "   下载构建依赖..."
 pip3 download "setuptools<70" "wheel" -d libs -i https://mirrors.aliyun.com/pypi/simple/
 
-# 下载项目依赖
-echo "   下载项目依赖..."
+# 下载项目依赖（包括所有传递依赖）
+echo "   下载项目依赖及其所有传递依赖..."
 pip3 download -r requirements.txt -d libs -i https://mirrors.aliyun.com/pypi/simple/
+
+# 手动下载 Python 3.8/3.9 需要的额外依赖
+echo "   下载 Python 3.8/3.9 兼容性依赖..."
+pip3 download "importlib-metadata>=3.6.0" "zipp>=0.5" -d libs -i https://mirrors.aliyun.com/pypi/simple/
 
 # 获取包数量和大小
 PKG_COUNT=$(ls -1 libs/*.whl libs/*.tar.gz 2>/dev/null | wc -l | tr -d ' ')
