@@ -74,7 +74,7 @@ pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 {
   "server": {
     "host": "0.0.0.0",
-    "port": 3000,
+    "port": 3001,
     "debug": false
   },
   "admin": {
@@ -177,9 +177,9 @@ sudo systemctl restart device-manager
 **解决**:
 ```bash
 # 查看占用端口的进程
-sudo netstat -tuln | grep :3000
+sudo netstat -tuln | grep :3001
 # 或
-sudo ss -tuln | grep :3000
+sudo ss -tuln | grep :3001
 
 # 修改配置文件中的端口
 vi /opt/device-manager/config.json
@@ -292,7 +292,7 @@ cat > /opt/device-manager/start_gunicorn.sh << 'EOF'
 #!/bin/bash
 cd /opt/device-manager/backend
 source /opt/device-manager/.venv/bin/activate
-gunicorn --worker-class eventlet -w 1 -b 0.0.0.0:3000 app:app
+gunicorn --worker-class eventlet -w 1 -b 0.0.0.0:3001 app:app
 EOF
 
 chmod +x /opt/device-manager/start_gunicorn.sh
@@ -308,7 +308,7 @@ server {
     server_name your-domain.com;
 
     location / {
-        proxy_pass http://127.0.0.1:3000;
+        proxy_pass http://127.0.0.1:3001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -402,7 +402,7 @@ sudo systemctl restart device-manager
 
 ---
 
-**部署完成后访问**: http://your-server-ip:3000
+**部署完成后访问**: http://your-server-ip:3001
 
 默认管理员账号：
 - 用户名：admin

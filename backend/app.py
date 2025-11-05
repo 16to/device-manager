@@ -23,7 +23,7 @@ print(f"配置文件存在: {os.path.exists(config_path)}")
 
 # 默认配置
 DEFAULT_CONFIG = {
-    "server": {"host": "0.0.0.0", "port": 3000, "debug": True},
+    "server": {"host": "0.0.0.0", "port": 3001, "debug": True},
     "admin": {"username": "admin", "password": "admin123"},
     "database": {"path": "backend/device_manager.db"},
     "user": {"default_password": "123456"},

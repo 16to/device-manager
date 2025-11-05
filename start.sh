@@ -38,7 +38,7 @@ echo "📥 安装Python依赖包..."
 pip3 install -q -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 # 读取配置文件中的端口号
-PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])" 2>/dev/null || echo "3000")
+PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])" 2>/dev/null || echo "3001")
 ADMIN_USER=$(python3 -c "import json; print(json.load(open('config.json'))['admin']['username'])" 2>/dev/null || echo "admin")
 ADMIN_PASS=$(python3 -c "import json; print(json.load(open('config.json'))['admin']['password'])" 2>/dev/null || echo "admin123")
 DEFAULT_PASS=$(python3 -c "import json; print(json.load(open('config.json'))['user']['default_password'])" 2>/dev/null || echo "123456")

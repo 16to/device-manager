@@ -32,8 +32,8 @@ fi
 echo -e "${GREEN}✓ Docker已安装${NC}"
 
 # 获取配置
-read -p "服务端口 [默认: 3000]: " PORT
-PORT=${PORT:-3000}
+read -p "服务端口 [默认: 3001]: " PORT
+PORT=${PORT:-3001}
 
 read -p "管理员用户名 [默认: admin]: " ADMIN_USER
 ADMIN_USER=${ADMIN_USER:-admin}
@@ -60,7 +60,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt -i https://mirrors.aliyun.co
 COPY . .
 
 # 暴露端口
-EXPOSE 3000
+EXPOSE 3001
 
 # 启动命令
 CMD ["python", "backend/app.py"]

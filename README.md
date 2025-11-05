@@ -40,7 +40,7 @@ python3 app.py
 ```
 
 3. **访问系统**
-在浏览器中打开：http://localhost:3000
+在浏览器中打开：http://localhost:3001
 
 ## 📖 使用说明
 
@@ -107,7 +107,7 @@ device-manager/
 3. 数据库文件不会被提交到git，部署时会创建全新的空数据库
 4. 建议在Chrome、Firefox、Safari等现代浏览器中使用
 5. 生产环境部署时，请修改默认管理员密码（在 config.json 中）
-6. 系统前后端已合并，统一使用3000端口
+6. 系统前后端已合并，统一使用3001端口
 7. 可在 config.json 中修改端口等配置
 8. 所有静态资源已本地化，无需依赖外部CDN
 
@@ -120,4 +120,4 @@ Device Manager Team
 ---
 
 **系统已成功部署并运行！** 🎉
-- 访问地址: http://localhost:3000
+- 访问地址: http://localhost:3001
