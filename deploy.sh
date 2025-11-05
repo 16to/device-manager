@@ -262,14 +262,8 @@ install_python_deps() {
     # 安装依赖
     log_info "安装Python依赖包..."
     if [ -f "requirements.txt" ]; then
-        # 优先使用本地 libs 目录（离线安装）
-        if [ -d "libs" ] && [ "$(ls -A libs 2>/dev/null)" ]; then
-            log_info "使用本地依赖包（离线模式）..."
-            python3 -m pip install --no-index --find-links=libs -r requirements.txt
-        else
-            log_info "从镜像源下载依赖包..."
-            python3 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
-        fi
+        log_info "从镜像源下载依赖包..."
+        python3 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
     else
         python3 -m pip install -i https://mirrors.aliyun.com/pypi/simple/ \
             'Flask>=2.0.0,<3.0.0' \
