@@ -35,7 +35,13 @@ source .venv/bin/activate
 
 # 安装依赖
 echo "📥 安装Python依赖包..."
-pip3 install -q -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+if [ -d "libs" ] && [ "$(ls -A libs 2>/dev/null)" ]; then
+    echo "   使用本地依赖包（离线模式）..."
+    pip3 install -q --no-index --find-links=libs -r requirements.txt
+else
+    echo "   从镜像源下载依赖包..."
+    pip3 install -q -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+fi
 
 # 读取配置文件中的端口号
 PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])" 2>/dev/null || echo "3001")
