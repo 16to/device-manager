@@ -298,15 +298,17 @@ init_database() {
     fi
     
     # 检查是否已存在数据库文件
-    if [ -f "backend/device_manager.db" ]; then
+    DB_FILE="$DEPLOY_DIR/backend/device_manager.db"
+    if [ -f "$DB_FILE" ]; then
         echo ""
-        log_warn "⚠️  检测到已存在的数据库文件"
+        log_warn "⚠️  检测到已存在的数据库文件: $DB_FILE"
         log_warn "⚠️  数据库初始化将删除所有现有数据（包括设备、用户、使用记录等）"
         echo ""
         read -p "是否要重新初始化数据库? [y/N]: " INIT_DB
     else
         echo ""
-        log_info "未检测到数据库文件，建议进行初始化"
+        log_info "未检测到数据库文件: $DB_FILE"
+        log_info "建议进行初始化以创建数据库表和管理员账号"
         read -p "是否初始化数据库? [Y/n]: " INIT_DB
         INIT_DB=${INIT_DB:-Y}
     fi
