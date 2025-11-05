@@ -105,9 +105,13 @@ try:
             os.makedirs(db_dir)
             print(f"✅ 创建数据库目录: {db_dir}")
         
+        # 确保所有模型都已注册（显式引用）
+        # 这样可以确保 SQLAlchemy 知道所有的表模型
+        _ = [Device, User, UsageRecord, AllowedUser]
+        
         # 创建所有表
         db.create_all()
-        print(f"✅ 数据库表创建成功")
+        print(f"✅ 数据库表创建成功（devices, users, usage_records, allowed_users）")
         
         # 创建默认管理员用户
         print(f"检查管理员用户...")
