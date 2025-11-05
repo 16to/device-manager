@@ -58,6 +58,11 @@ pip3 download -r requirements.txt -d libs -i https://mirrors.aliyun.com/pypi/sim
 echo "   下载 Python 3.8/3.9 兼容性依赖..."
 pip3 download "importlib-metadata>=3.6.0" "zipp>=0.5" -d libs -i https://mirrors.aliyun.com/pypi/simple/
 
+# 下载 Linux 平台的二进制包（用于跨平台部署）
+echo "   下载 Linux x86_64 平台包..."
+pip3 download --platform manylinux2014_x86_64 --only-binary=:all: "bcrypt>=3.2" "cryptography>=3.3" -d libs -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+pip3 download --platform manylinux2014_x86_64 --only-binary=:all: "PyNaCl>=1.5" "cffi>=1.12" "MarkupSafe>=2.0" -d libs -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+
 # 获取包数量和大小
 PKG_COUNT=$(ls -1 libs/*.whl libs/*.tar.gz 2>/dev/null | wc -l | tr -d ' ')
 LIBS_SIZE=$(du -sh libs | cut -f1)

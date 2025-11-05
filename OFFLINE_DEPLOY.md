@@ -74,11 +74,13 @@ sudo ./deploy.sh
 - 构建依赖：setuptools (<70, 兼容 Python 3.8), wheel
 - 项目依赖：Flask, SQLAlchemy, paramiko 等所有 requirements.txt 中的包
 - Python 3.8/3.9 兼容性依赖：importlib-metadata, zipp
+- Linux x86_64 平台包：bcrypt, cryptography, PyNaCl, cffi, MarkupSafe（用于跨平台部署）
 
 **重要**：
 - setuptools 70+ 需要 Python 3.9+，脚本会自动下载 setuptools 69.x
 - importlib-metadata 是 Python 3.8/3.9 环境下 Flask 的必需依赖
-- 总共约 28 个包，大小约 18MB
+- 包含 macOS 和 Linux x86_64 两个平台的二进制包，支持跨平台部署
+- 总共约 33 个包，大小约 24MB
 
 # 2. 打包整个项目（包含 libs/）
 tar -czf device-manager.tar.gz .
