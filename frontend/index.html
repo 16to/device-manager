@@ -1868,7 +1868,7 @@
                         <!-- 第二行：状态过滤 + 本人占用筛选 + 标签筛选 -->
                         <div class="filter-tags-row">
                             <div class="filter-group">
-                                <label style="font-size: 14px; color: #666; margin-right: 10px; font-weight: bold;">状态筛选：</label>
+                                <label style="font-size: 14px; color: #666; margin-right: 10px;">状态筛选：</label>
                                 <select v-model="statusFilter" class="filter-select">
                                     <option value="">全部状态</option>
                                     <option value="available">空闲</option>
@@ -1877,7 +1877,7 @@
                             </div>
                             
                             <div v-if="isLoggedIn" class="filter-group">
-                                <label style="font-size: 14px; color: #666; margin-right: 10px; font-weight: bold;">占用筛选：</label>
+                                <label style="font-size: 14px; color: #666; margin-right: 10px;">占用筛选：</label>
                                 <select v-model="occupiedByMeFilter" class="filter-select">
                                     <option value="">全部设备</option>
                                     <option value="yes">本人占用</option>
