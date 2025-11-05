@@ -5,7 +5,7 @@ from datetime import datetime
 import os
 import sys
 import json
-from models import db, Device, User, UsageRecord, AllowedUser
+from models import db
 from terminal import TerminalManager
 
 # 读取配置文件
@@ -95,6 +95,9 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 
+# 在数据库初始化后导入模型类（重要！确保模型能被正确注册）
+from models import Device, User, UsageRecord, AllowedUser
+
 # 创建数据库表
 print(f"创建数据库表...")
 try:
@@ -104,6 +107,9 @@ try:
         if db_dir and not os.path.exists(db_dir):
             os.makedirs(db_dir)
             print(f"✅ 创建数据库目录: {db_dir}")
+        
+        # 导入所有模型以确保它们被注册
+        import models
         
         # 确保所有模型都已注册（显式引用）
         # 这样可以确保 SQLAlchemy 知道所有的表模型
