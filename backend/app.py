@@ -99,6 +99,13 @@ except Exception as e:
 print(f"创建数据库表...")
 try:
     with app.app_context():
+        # 确保数据库目录存在
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir)
+            print(f"✅ 创建数据库目录: {db_dir}")
+        
+        # 创建所有表
         db.create_all()
         print(f"✅ 数据库表创建成功")
         
@@ -106,7 +113,13 @@ try:
         print(f"检查管理员用户...")
         admin_username = CONFIG['admin']['username']
         admin_password = CONFIG['admin']['password']
-        admin = User.query.filter_by(username=admin_username).first()
+        
+        try:
+            admin = User.query.filter_by(username=admin_username).first()
+        except:
+            # 如果查询失败（表可能刚创建），直接创建用户
+            admin = None
+        
         if not admin:
             admin = User(username=admin_username, password=admin_password, is_admin=True)
             db.session.add(admin)
@@ -115,7 +128,7 @@ try:
         else:
             print(f"✅ 管理员用户已存在: {admin_username}")
 except Exception as e:
-    print(f"❌ 数据库表创建失败: {e}")
+    print(f"❌ 数据库初始化失败: {e}")
     import traceback
     traceback.print_exc()
     sys.exit(1)
