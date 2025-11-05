@@ -58,10 +58,13 @@ pip3 download -r requirements.txt -d libs -i https://mirrors.aliyun.com/pypi/sim
 echo "   下载 Python 3.8/3.9 兼容性依赖..."
 pip3 download "importlib-metadata>=3.6.0" "zipp>=0.5" -d libs -i https://mirrors.aliyun.com/pypi/simple/
 
-# 下载 Linux 平台的二进制包（用于跨平台部署）
-echo "   下载 Linux x86_64 平台包..."
-pip3 download --platform manylinux2014_x86_64 --only-binary=:all: "bcrypt>=3.2" "cryptography>=3.3" -d libs -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
-pip3 download --platform manylinux2014_x86_64 --only-binary=:all: "PyNaCl>=1.5" "cffi>=1.12" "MarkupSafe>=2.0" -d libs -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+# 下载 Linux 平台的二进制包（用于跨平台部署，兼容 Python 3.8）
+echo "   下载 Linux x86_64 平台包（Python 3.8+ 兼容）..."
+# 下载带源码的包，确保可以在任何平台上安装
+pip3 download --no-binary bcrypt "bcrypt>=3.2,<5.0" -d libs -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+pip3 download --no-binary MarkupSafe "MarkupSafe>=2.0" -d libs -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
+# 下载 Python 3.8 兼容的二进制包
+pip3 download --platform manylinux2014_x86_64 --python-version 38 --only-binary=:all: "cryptography>=3.3" "PyNaCl>=1.5" "cffi>=1.12" -d libs -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || true
 
 # 获取包数量和大小
 PKG_COUNT=$(ls -1 libs/*.whl libs/*.tar.gz 2>/dev/null | wc -l | tr -d ' ')
