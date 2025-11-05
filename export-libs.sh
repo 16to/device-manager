@@ -44,6 +44,13 @@ mkdir -p libs
 # 导出所有已安装的包到 libs 目录
 echo ""
 echo "导出依赖包到 libs/ 目录..."
+
+# 先下载构建依赖（setuptools, wheel 等）
+echo "   下载构建依赖..."
+pip3 download setuptools wheel -d libs -i https://mirrors.aliyun.com/pypi/simple/
+
+# 下载项目依赖
+echo "   下载项目依赖..."
 pip3 download -r requirements.txt -d libs -i https://mirrors.aliyun.com/pypi/simple/
 
 # 获取包数量和大小

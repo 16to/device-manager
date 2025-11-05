@@ -61,8 +61,18 @@ sudo ./deploy.sh
 
 ### 场景二：完全离线环境
 ```bash
-# 1. 在有网络的机器上准备
+### 第一步：准备离线依赖包
+
+在有网络环境的机器上：
+
+```bash
+# 导出所有依赖到 libs/ 目录（包括构建工具 setuptools 和 wheel）
 ./export-libs.sh
+```
+
+**注意**：export-libs.sh 会自动下载：
+- 构建依赖：setuptools, wheel
+- 项目依赖：Flask, SQLAlchemy, paramiko 等所有 requirements.txt 中的包
 
 # 2. 打包整个项目（包含 libs/）
 tar -czf device-manager.tar.gz .
