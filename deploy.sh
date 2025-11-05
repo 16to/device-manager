@@ -283,25 +283,50 @@ install_python_deps() {
     log_info "已安装的关键包版本："
     python3 -m pip list | grep -E "Flask|SQLAlchemy|Werkzeug|socketio|paramiko" || true
     
-    # 初始化数据库（可选）
-    log_step "数据库初始化..."
-    if [ -f "init_db.py" ]; then
-        echo ""
-        log_warn "⚠️  数据库初始化将删除所有现有数据并创建空数据库！"
-        read -p "是否初始化数据库? [y/N]: " INIT_DB
-        INIT_DB=${INIT_DB:-N}
-        
-        if [[ $INIT_DB =~ ^[Yy]$ ]]; then
-            python3 init_db.py
-            log_info "数据库初始化完成"
-        else
-            log_info "跳过数据库初始化，将保留现有数据库"
-        fi
-    else
+    deactivate
+}
+
+# 初始化数据库（交互式）
+init_database() {
+    log_step "数据库初始化（可选）..."
+    
+    cd "$DEPLOY_DIR"
+    
+    if [ ! -f "init_db.py" ]; then
         log_warn "init_db.py 不存在，跳过数据库初始化"
+        return 0
     fi
     
-    deactivate
+    # 检查是否已存在数据库文件
+    if [ -f "backend/device_manager.db" ]; then
+        echo ""
+        log_warn "⚠️  检测到已存在的数据库文件"
+        log_warn "⚠️  数据库初始化将删除所有现有数据（包括设备、用户、使用记录等）"
+        echo ""
+        read -p "是否要重新初始化数据库? [y/N]: " INIT_DB
+    else
+        echo ""
+        log_info "未检测到数据库文件，建议进行初始化"
+        read -p "是否初始化数据库? [Y/n]: " INIT_DB
+        INIT_DB=${INIT_DB:-Y}
+    fi
+    
+    INIT_DB=${INIT_DB:-N}
+    
+    if [[ $INIT_DB =~ ^[Yy]$ ]]; then
+        log_info "正在初始化数据库..."
+        source .venv/bin/activate
+        python3 init_db.py
+        deactivate
+        log_info "数据库初始化完成"
+    else
+        log_info "跳过数据库初始化"
+        if [ -f "backend/device_manager.db" ]; then
+            log_info "将使用现有数据库"
+        else
+            log_warn "注意：未初始化数据库，首次运行可能会自动创建数据库表"
+        fi
+    fi
 }
 
 # 配置防火墙
@@ -447,6 +472,7 @@ main() {
     copy_files
     create_config
     install_python_deps
+    init_database
     configure_firewall
     create_systemd_service
     start_service
