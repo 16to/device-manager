@@ -282,11 +282,20 @@ install_python_deps() {
     log_info "已安装的关键包版本："
     python3 -m pip list | grep -E "Flask|SQLAlchemy|Werkzeug|socketio|paramiko" || true
     
-    # 初始化数据库
-    log_step "初始化数据库..."
+    # 初始化数据库（可选）
+    log_step "数据库初始化..."
     if [ -f "init_db.py" ]; then
-        python3 init_db.py
-        log_info "数据库初始化完成"
+        echo ""
+        log_warn "⚠️  数据库初始化将删除所有现有数据并创建空数据库！"
+        read -p "是否初始化数据库? [y/N]: " INIT_DB
+        INIT_DB=${INIT_DB:-N}
+        
+        if [[ $INIT_DB =~ ^[Yy]$ ]]; then
+            python3 init_db.py
+            log_info "数据库初始化完成"
+        else
+            log_info "跳过数据库初始化，将保留现有数据库"
+        fi
     else
         log_warn "init_db.py 不存在，跳过数据库初始化"
     fi
