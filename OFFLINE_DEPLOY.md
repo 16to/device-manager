@@ -71,8 +71,10 @@ sudo ./deploy.sh
 ```
 
 **注意**：export-libs.sh 会自动下载：
-- 构建依赖：setuptools, wheel
+- 构建依赖：setuptools (<70, 兼容 Python 3.8), wheel
 - 项目依赖：Flask, SQLAlchemy, paramiko 等所有 requirements.txt 中的包
+
+**重要**：setuptools 70+ 需要 Python 3.9+，为了兼容 Python 3.8，脚本会自动下载 setuptools 69.x 版本
 
 # 2. 打包整个项目（包含 libs/）
 tar -czf device-manager.tar.gz .

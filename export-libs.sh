@@ -46,8 +46,9 @@ echo ""
 echo "导出依赖包到 libs/ 目录..."
 
 # 先下载构建依赖（setuptools, wheel 等）
+# 注意：使用兼容 Python 3.8 的版本
 echo "   下载构建依赖..."
-pip3 download setuptools wheel -d libs -i https://mirrors.aliyun.com/pypi/simple/
+pip3 download "setuptools<70" "wheel" -d libs -i https://mirrors.aliyun.com/pypi/simple/
 
 # 下载项目依赖
 echo "   下载项目依赖..."
