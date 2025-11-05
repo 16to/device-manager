@@ -35,8 +35,7 @@ source .venv/bin/activate
 
 # 安装依赖
 echo "📥 安装Python依赖包..."
-echo "   从镜像源下载依赖包..."
-pip3 install -q -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+pip3 install -q -r requirements.txt
 
 # 读取配置文件中的端口号
 PORT=$(python3 -c "import json; print(json.load(open('config.json'))['server']['port'])" 2>/dev/null || echo "3001")

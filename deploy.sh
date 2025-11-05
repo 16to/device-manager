@@ -257,15 +257,15 @@ install_python_deps() {
     source .venv/bin/activate
     
     # 升级pip
-    python3 -m pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/ 2>/dev/null || python3 -m pip install --upgrade pip
+    python3 -m pip install --upgrade pip
     
     # 安装依赖
     log_info "安装Python依赖包..."
     if [ -f "requirements.txt" ]; then
-        log_info "从镜像源下载依赖包..."
-        python3 -m pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+        log_info "安装依赖包..."
+        python3 -m pip install -r requirements.txt
     else
-        python3 -m pip install -i https://mirrors.aliyun.com/pypi/simple/ \
+        python3 -m pip install \
             'Flask>=2.0.0,<3.0.0' \
             'Flask-CORS>=3.0.0' \
             'Werkzeug>=2.0.0,<3.0.0' \

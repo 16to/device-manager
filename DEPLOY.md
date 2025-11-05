@@ -60,10 +60,10 @@ python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-#### 2. 安装依赖（使用国内镜像）
+#### 2. 安装依赖
 
 ```bash
-pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+pip3 install -r requirements.txt
 ```
 
 #### 3. 配置系统
@@ -154,7 +154,7 @@ python3 app.py
 ```bash
 cd /opt/device-manager
 source .venv/bin/activate
-pip3 install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+pip3 install -r requirements.txt
 sudo systemctl restart device-manager
 ```
 
