@@ -170,19 +170,46 @@ create_deploy_dir() {
     
     if [ -d "$DEPLOY_DIR" ]; then
         log_warn "目录已存在: $DEPLOY_DIR"
-        read -p "是否清空并重新部署? [y/N]: " CLEAN
-        CLEAN=${CLEAN:-N}
-        if [[ $CLEAN =~ ^[Yy]$ ]]; then
-            $USE_SUDO rm -rf "$DEPLOY_DIR"
-            log_info "已清空目录"
-        else
-            log_error "部署已取消"
-            exit 0
-        fi
+        echo ""
+        log_info "部署选项："
+        log_info "• 选择 1: 覆盖部署（保留数据库文件，更新代码）【默认】"
+        log_info "• 选择 2: 清空重新部署（删除所有文件，包括数据库）"
+        log_info "• 选择 3: 取消部署"
+        echo ""
+        read -p "请选择 [默认: 1]: " DEPLOY_OPTION
+        DEPLOY_OPTION=${DEPLOY_OPTION:-1}
+        
+        case "$DEPLOY_OPTION" in
+            1)
+                log_info "将进行覆盖部署（保留数据库）"
+                ;;
+            2)
+                log_warn "将清空目录并重新部署"
+                $USE_SUDO rm -rf "$DEPLOY_DIR"
+                log_info "已清空目录"
+                ;;
+            3)
+                log_error "部署已取消"
+                exit 0
+                ;;
+            *)
+                log_error "无效的选择，部署已取消"
+                exit 0
+                ;;
+        esac
     fi
     
     $USE_SUDO mkdir -p "$DEPLOY_DIR"
-    $USE_SUDO chown -R $USER:$USER "$DEPLOY_DIR"
+    
+    # macOS 和 Linux 的 chown 语法不同
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS: 使用 staff 组
+        $USE_SUDO chown -R $USER:staff "$DEPLOY_DIR"
+    else
+        # Linux: 使用用户名作为组名
+        $USE_SUDO chown -R $USER:$USER "$DEPLOY_DIR"
+    fi
+    
     log_info "部署目录创建完成: $DEPLOY_DIR"
 }
 
@@ -297,17 +324,17 @@ init_database() {
         return 0
     fi
     
-    # 检查是否已存在数据库文件
-    DB_FILE="$DEPLOY_DIR/backend/device_manager.db"
+    # 检查是否已存在数据库文件（使用相对路径，因为已经 cd 到 DEPLOY_DIR）
+    DB_FILE="backend/device_manager.db"
     if [ -f "$DB_FILE" ]; then
         echo ""
-        log_warn "⚠️  检测到已存在的数据库文件: $DB_FILE"
+        log_warn "⚠️  检测到已存在的数据库文件: $(pwd)/$DB_FILE"
         log_warn "⚠️  数据库初始化将删除所有现有数据（包括设备、用户、使用记录等）"
         echo ""
         read -p "是否要重新初始化数据库? [y/N]: " INIT_DB
     else
         echo ""
-        log_info "未检测到数据库文件: $DB_FILE"
+        log_info "未检测到数据库文件: $(pwd)/$DB_FILE"
         log_info "建议进行初始化以创建数据库表和管理员账号"
         read -p "是否初始化数据库? [Y/n]: " INIT_DB
         INIT_DB=${INIT_DB:-Y}
