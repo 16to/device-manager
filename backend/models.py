@@ -22,8 +22,8 @@ class Device(db.Model):
     tags = db.Column(db.Text)  # 标签 (JSON格式)
     created_at = db.Column(db.DateTime, default=datetime.now)
     
-    # 关系
-    usage_records = db.relationship('UsageRecord', backref='device', lazy=True)
+    # 关系 - 使用 cascade 确保删除设备时同时删除相关记录
+    usage_records = db.relationship('UsageRecord', backref='device', lazy=True, cascade='all, delete-orphan')
     
     def __repr__(self):
         return f'<Device {self.name}>'
