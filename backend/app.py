@@ -117,7 +117,18 @@ try:
         
         # 创建所有表
         db.create_all()
-        print(f"✅ 数据库表创建成功（devices, users, usage_records, allowed_users）")
+        
+        # 验证表是否真的被创建
+        from sqlalchemy import inspect
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        print(f"✅ 数据库表创建成功，当前存在的表: {', '.join(table_names)}")
+        
+        # 检查必需的表是否都存在
+        required_tables = ['devices', 'users', 'usage_records', 'allowed_users']
+        missing_tables = [t for t in required_tables if t not in table_names]
+        if missing_tables:
+            raise Exception(f"缺少必需的表: {', '.join(missing_tables)}")
         
         # 创建默认管理员用户
         print(f"检查管理员用户...")
