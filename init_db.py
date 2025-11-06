@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 from flask import Flask
-from models import db, User
+from models import db, User, Device, UsageRecord, AllowedUser, AuditLog
 import json
 
 # 读取配置
@@ -44,6 +44,20 @@ with app.app_context():
     # 创建所有表
     db.create_all()
     print(f"✅ 已创建数据库表")
+    
+    # 验证表是否创建成功
+    from sqlalchemy import inspect
+    inspector = inspect(db.engine)
+    table_names = inspector.get_table_names()
+    print(f"✅ 当前数据库表: {', '.join(table_names)}")
+    
+    # 检查必需的表
+    required_tables = ['devices', 'users', 'usage_records', 'allowed_users', 'audit_logs']
+    missing_tables = [t for t in required_tables if t not in table_names]
+    if missing_tables:
+        print(f"❌ 警告: 缺少以下表: {', '.join(missing_tables)}")
+    else:
+        print(f"✅ 所有必需的表都已创建")
     
     # 创建默认管理员
     admin_username = CONFIG['admin']['username']
