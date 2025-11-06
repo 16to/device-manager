@@ -211,9 +211,6 @@ def start_background_tasks():
     except Exception as e:
         print(f"❌ 初始清理失败: {e}")
 
-# 启动后台任务
-start_background_tasks()
-
 # ==================== 辅助函数 ====================
 
 def log_audit(action_type, operator, details=None, ip_address=None):
@@ -1257,6 +1254,9 @@ def handle_upload_file(data):
 
 if __name__ == '__main__':
     try:
+        # 启动后台任务
+        start_background_tasks()
+        
         # 从配置文件读取服务器配置
         server_config = CONFIG['server']
         print(f"\n{'='*50}")
