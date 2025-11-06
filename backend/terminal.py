@@ -227,6 +227,20 @@ class TerminalManager:
             return conn.send(data)
         return False
     
+    def resize_terminal(self, session_id, cols, rows):
+        """调整终端大小"""
+        conn = self.connections.get(session_id)
+        if conn and isinstance(conn, SSHConnection) and conn.channel:
+            try:
+                # 只有 SSH 连接支持调整终端大小
+                conn.channel.resize_pty(width=cols, height=rows)
+                print(f"终端大小已调整: {session_id} -> {cols}x{rows}")
+                return True
+            except Exception as e:
+                print(f"调整终端大小失败: {e}")
+                return False
+        return False
+    
     def close_connection(self, session_id):
         """关闭连接"""
         conn = self.connections.get(session_id)

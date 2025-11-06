@@ -77,3 +77,17 @@ class AllowedUser(db.Model):
     
     def __repr__(self):
         return f'<AllowedUser {self.account} - {self.chinese_name}>'
+
+class AuditLog(db.Model):
+    """审计日志模型 - 记录系统操作日志"""
+    __tablename__ = 'audit_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    action_type = db.Column(db.String(50), nullable=False)  # 操作类型：login, device_add, device_delete, user_add等
+    operator = db.Column(db.String(100), nullable=False)  # 操作人
+    ip_address = db.Column(db.String(50))  # IP地址
+    details = db.Column(db.Text)  # 操作详情（JSON格式）
+    created_at = db.Column(db.DateTime, default=datetime.now, index=True)  # 创建时间，添加索引以提高查询性能
+    
+    def __repr__(self):
+        return f'<AuditLog {self.id} - {self.action_type}>'

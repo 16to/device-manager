@@ -27,7 +27,8 @@ DEFAULT_CONFIG = {
     "admin": {"username": "admin", "password": "admin123"},
     "database": {"path": "backend/device_manager.db"},
     "user": {"default_password": "123456"},
-    "socketio": {"ping_timeout": 120, "ping_interval": 25, "max_http_buffer_size": 1073741824}
+    "socketio": {"ping_timeout": 120, "ping_interval": 25, "max_http_buffer_size": 1073741824},
+    "system": {"title": "设备使用管理系统"}  # 系统标题配置
 }
 
 try:
@@ -96,7 +97,7 @@ except Exception as e:
     sys.exit(1)
 
 # 在数据库初始化后导入模型类（重要！确保模型能被正确注册）
-from models import Device, User, UsageRecord, AllowedUser
+from models import Device, User, UsageRecord, AllowedUser, AuditLog
 
 # 创建数据库表
 print(f"创建数据库表...")
@@ -113,7 +114,7 @@ try:
         
         # 确保所有模型都已注册（显式引用）
         # 这样可以确保 SQLAlchemy 知道所有的表模型
-        _ = [Device, User, UsageRecord, AllowedUser]
+        _ = [Device, User, UsageRecord, AllowedUser, AuditLog]
         
         # 创建所有表
         db.create_all()
@@ -125,7 +126,7 @@ try:
         print(f"✅ 数据库表创建成功，当前存在的表: {', '.join(table_names)}")
         
         # 检查必需的表是否都存在
-        required_tables = ['devices', 'users', 'usage_records', 'allowed_users']
+        required_tables = ['devices', 'users', 'usage_records', 'allowed_users', 'audit_logs']
         missing_tables = [t for t in required_tables if t not in table_names]
         if missing_tables:
             raise Exception(f"缺少必需的表: {', '.join(missing_tables)}")
@@ -157,7 +158,90 @@ except Exception as e:
 print(f"✅ 所有初始化完成")
 print(f"{'='*40}\n")
 
+# ==================== 工具函数 ====================
+
+def clean_old_audit_logs():
+    """清理30天前的审计日志"""
+    try:
+        from datetime import timedelta
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        
+        # 删除30天前的审计日志
+        deleted_count = AuditLog.query.filter(
+            AuditLog.created_at < thirty_days_ago
+        ).delete()
+        
+        if deleted_count > 0:
+            db.session.commit()
+            print(f"✅ 已清理 {deleted_count} 条30天前的审计日志")
+        
+        return deleted_count
+    except Exception as e:
+        print(f"❌ 清理审计日志失败: {e}")
+        db.session.rollback()
+        return 0
+
+# ==================== 后台任务 ====================
+
+def start_background_tasks():
+    """启动后台定时任务"""
+    import threading
+    import time
+    
+    def cleanup_task():
+        """定期清理任务"""
+        while True:
+            try:
+                # 每24小时清理一次30天前的审计日志
+                time.sleep(86400)  # 24小时 = 86400秒
+                with app.app_context():
+                    clean_old_audit_logs()
+            except Exception as e:
+                print(f"❌ 后台清理任务出错: {e}")
+    
+    # 启动清理线程
+    cleanup_thread = threading.Thread(target=cleanup_task, daemon=True)
+    cleanup_thread.start()
+    print(f"✅ 后台清理任务已启动（每24小时清理30天前的审计日志）")
+    
+    # 应用启动时立即清理一次
+    try:
+        with app.app_context():
+            clean_old_audit_logs()
+    except Exception as e:
+        print(f"❌ 初始清理失败: {e}")
+
+# 启动后台任务
+start_background_tasks()
+
 # ==================== 辅助函数 ====================
+
+def log_audit(action_type, operator, details=None, ip_address=None):
+    """
+    记录审计日志
+    
+    :param action_type: 操作类型，如 'login', 'device_add', 'device_delete', 'user_add' 等
+    :param operator: 操作人
+    :param details: 操作详情（字典格式，会转为JSON）
+    :param ip_address: IP地址，如果不提供则从request中获取
+    """
+    try:
+        if ip_address is None:
+            ip_address = request.remote_addr if request else None
+        
+        details_json = json.dumps(details, ensure_ascii=False) if details else None
+        
+        log = AuditLog(
+            action_type=action_type,
+            operator=operator,
+            ip_address=ip_address,
+            details=details_json
+        )
+        db.session.add(log)
+        db.session.commit()
+    except Exception as e:
+        print(f"❌ 记录审计日志失败: {e}")
+        db.session.rollback()
 
 def check_and_release_expired_devices():
     """检查并自动释放过期的设备"""
@@ -185,8 +269,6 @@ def check_and_release_expired_devices():
     
     if expired_devices:
         db.session.commit()
-    
-    return len(expired_devices)
 
 # ==================== 前端路由 ====================
 
@@ -202,7 +284,116 @@ def get_config():
     """获取配置信息（不包含敏感信息）"""
     return jsonify({
         'admin_username': CONFIG['admin']['username'],
-        'default_password': CONFIG['user']['default_password']
+        'default_password': CONFIG['user']['default_password'],
+        'system': {
+            'title': CONFIG.get('system', {}).get('title', '设备使用管理系统')  # 获取系统标题，如果未配置则使用默认值
+        }
+    })
+
+@app.route('/api/config/system/title', methods=['PUT'])
+def update_system_title():
+    """更新系统标题"""
+    data = request.json
+    if not data or 'title' not in data:
+        return jsonify({'message': '标题不能为空'}), 400
+    
+    new_title = data['title'].strip()
+    if not new_title:
+        return jsonify({'message': '标题不能为空'}), 400
+    
+    # 更新内存中的配置
+    CONFIG.setdefault('system', {})
+    CONFIG['system']['title'] = new_title
+    
+    # 保存到配置文件
+    try:
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(CONFIG, f, ensure_ascii=False, indent=2)
+        return jsonify({
+            'message': '系统标题已更新',
+            'title': new_title
+        })
+    except Exception as e:
+        return jsonify({'message': f'保存配置失败: {str(e)}'}), 500
+
+# ==================== 审计日志 API ====================
+
+@app.route('/api/audit-logs', methods=['GET'])
+def get_audit_logs():
+    """获取审计日志列表"""
+    # 获取分页参数
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 50, type=int)
+    
+    # 获取筛选参数
+    action_type = request.args.get('action_type', '').strip()
+    operator = request.args.get('operator', '').strip()
+    start_date = request.args.get('start_date', '').strip()
+    end_date = request.args.get('end_date', '').strip()
+    
+    # 构建查询
+    query = AuditLog.query
+    
+    # 按操作类型筛选
+    if action_type:
+        query = query.filter(AuditLog.action_type == action_type)
+    
+    # 按操作人筛选
+    if operator:
+        query = query.filter(AuditLog.operator.like(f'%{operator}%'))
+    
+    # 按时间范围筛选
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            query = query.filter(AuditLog.created_at >= start_dt)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            from datetime import timedelta
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d') + timedelta(days=1)
+            query = query.filter(AuditLog.created_at < end_dt)
+        except ValueError:
+            pass
+    
+    # 按时间倒序排列
+    query = query.order_by(AuditLog.created_at.desc())
+    
+    # 分页
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    
+    logs = []
+    for log in pagination.items:
+        log_data = {
+            'id': log.id,
+            'action_type': log.action_type,
+            'operator': log.operator,
+            'ip_address': log.ip_address,
+            'details': json.loads(log.details) if log.details else None,
+            'created_at': log.created_at.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        logs.append(log_data)
+    
+    return jsonify({
+        'logs': logs,
+        'total': pagination.total,
+        'page': page,
+        'per_page': per_page,
+        'pages': pagination.pages
+    })
+
+@app.route('/api/audit-logs/action-types', methods=['GET'])
+def get_action_types():
+    """获取所有操作类型（用于筛选下拉框）"""
+    from sqlalchemy import distinct
+    
+    action_types = db.session.query(distinct(AuditLog.action_type)).all()
+    types = [t[0] for t in action_types if t[0]]
+    
+    return jsonify({
+        'action_types': sorted(types)
     })
 
 @app.route('/api/admin/login', methods=['POST'])
@@ -213,8 +404,18 @@ def admin_login():
     password = data.get('password')
     
     if username == CONFIG['admin']['username'] and password == CONFIG['admin']['password']:
+        # 记录登录成功的审计日志
+        log_audit('admin_login', username, {
+            'status': 'success',
+            'message': '管理员登录成功'
+        })
         return jsonify({'success': True, 'message': '登录成功'})
     else:
+        # 记录登录失败的审计日志
+        log_audit('admin_login_failed', username or 'unknown', {
+            'status': 'failed',
+            'message': '用户名或密码错误'
+        })
         return jsonify({'success': False, 'message': '用户名或密码错误'}), 401
 
 # ==================== 设备管理 API ====================
@@ -302,6 +503,14 @@ def create_device():
     )
     db.session.add(device)
     db.session.commit()
+    
+    # 记录审计日志
+    log_audit('device_add', 'admin', {
+        'device_id': device.id,
+        'device_name': device.name,
+        'device_ip': device.ip
+    })
+    
     return jsonify({'message': '设备添加成功', 'id': device.id}), 201
 
 @app.route('/api/devices/<int:device_id>', methods=['PUT'])
@@ -309,6 +518,8 @@ def update_device(device_id):
     """更新设备信息"""
     device = Device.query.get_or_404(device_id)
     data = request.json
+    
+    old_name = device.name
     
     device.name = data.get('name', device.name)
     device.ip = data.get('ip', device.ip)
@@ -323,12 +534,23 @@ def update_device(device_id):
         device.tags = json.dumps(data.get('tags', []))
     
     db.session.commit()
+    
+    # 记录审计日志
+    log_audit('device_update', 'admin', {
+        'device_id': device.id,
+        'old_name': old_name,
+        'new_name': device.name,
+        'device_ip': device.ip
+    })
+    
     return jsonify({'message': '设备更新成功'})
 
 @app.route('/api/devices/<int:device_id>', methods=['DELETE'])
 def delete_device(device_id):
     """删除设备"""
     device = Device.query.get_or_404(device_id)
+    device_name = device.name
+    device_ip = device.ip
     
     # 先删除该设备的所有使用记录
     UsageRecord.query.filter_by(device_id=device_id).delete()
@@ -336,6 +558,14 @@ def delete_device(device_id):
     # 再删除设备
     db.session.delete(device)
     db.session.commit()
+    
+    # 记录审计日志
+    log_audit('device_delete', 'admin', {
+        'device_id': device_id,
+        'device_name': device_name,
+        'device_ip': device_ip
+    })
+    
     return jsonify({'message': '设备删除成功'})
 
 @app.route('/api/devices/batch-delete', methods=['POST'])
@@ -351,6 +581,10 @@ def batch_delete_devices():
         return jsonify({'message': '参数格式错误'}), 400
     
     try:
+        # 获取要删除的设备名称（用于审计日志）
+        devices_to_delete = Device.query.filter(Device.id.in_(device_ids)).all()
+        device_names = [d.name for d in devices_to_delete]
+        
         # 先删除这些设备的所有使用记录
         UsageRecord.query.filter(UsageRecord.device_id.in_(device_ids)).delete(synchronize_session=False)
         
@@ -358,6 +592,14 @@ def batch_delete_devices():
         deleted_count = Device.query.filter(Device.id.in_(device_ids)).delete(synchronize_session=False)
         
         db.session.commit()
+        
+        # 记录审计日志
+        log_audit('device_batch_delete', 'admin', {
+            'deleted_count': deleted_count,
+            'device_ids': device_ids,
+            'device_names': device_names
+        })
+        
         return jsonify({
             'message': f'成功删除 {deleted_count} 台设备',
             'deleted_count': deleted_count
@@ -424,6 +666,14 @@ def batch_import_devices():
     
     try:
         db.session.commit()
+        
+        # 记录审计日志
+        log_audit('device_batch_import', 'admin', {
+            'imported_count': success_count,
+            'failed_count': fail_count,
+            'total_count': len(devices_data)
+        })
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'数据库提交失败: {str(e)}'}), 500
@@ -647,6 +897,14 @@ def add_allowed_user():
     db.session.add(user)
     db.session.commit()
     
+    # 记录审计日志
+    log_audit('user_add', 'admin', {
+        'user_id': user.id,
+        'account': account,
+        'chinese_name': chinese_name,
+        'department': department
+    })
+    
     return jsonify({
         'message': '用户添加成功',
         'id': user.id,
@@ -659,9 +917,18 @@ def add_allowed_user():
 def delete_allowed_user(user_id):
     """删除授权用户"""
     user = AllowedUser.query.get_or_404(user_id)
+    user_account = user.account
+    user_name = user.chinese_name
     
     db.session.delete(user)
     db.session.commit()
+    
+    # 记录审计日志
+    log_audit('user_delete', 'admin', {
+        'user_id': user_id,
+        'account': user_account,
+        'chinese_name': user_name
+    })
     
     return jsonify({'message': '用户删除成功'})
 
@@ -678,11 +945,28 @@ def user_login():
     # 查找用户
     user = AllowedUser.query.filter_by(account=account).first()
     if not user:
+        # 记录登录失败
+        log_audit('user_login_failed', account, {
+            'status': 'failed',
+            'reason': '账号不存在'
+        })
         return jsonify({'message': '账号不存在'}), 401
     
     # 验证密码
     if user.password != password:
+        # 记录登录失败
+        log_audit('user_login_failed', account, {
+            'status': 'failed',
+            'reason': '密码错误'
+        })
         return jsonify({'message': '密码错误'}), 401
+    
+    # 记录登录成功
+    log_audit('user_login', account, {
+        'status': 'success',
+        'chinese_name': user.chinese_name,
+        'department': user.department
+    })
     
     return jsonify({
         'message': '登录成功',
@@ -733,8 +1017,19 @@ def batch_delete_users():
         return jsonify({'message': '没有选择要删除的用户'}), 400
     
     try:
+        # 获取要删除的用户信息（用于审计日志）
+        users_to_delete = AllowedUser.query.filter(AllowedUser.id.in_(user_ids)).all()
+        user_accounts = [u.account for u in users_to_delete]
+        
         deleted_count = AllowedUser.query.filter(AllowedUser.id.in_(user_ids)).delete(synchronize_session=False)
         db.session.commit()
+        
+        # 记录审计日志
+        log_audit('user_batch_delete', 'admin', {
+            'deleted_count': deleted_count,
+            'user_ids': user_ids,
+            'accounts': user_accounts
+        })
         
         return jsonify({
             'message': '批量删除成功',
@@ -791,6 +1086,14 @@ def batch_import_users():
     
     try:
         db.session.commit()
+        
+        # 记录审计日志
+        log_audit('user_batch_import', 'admin', {
+            'success_count': success_count,
+            'fail_count': fail_count,
+            'total_count': len(users_data)
+        })
+        
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'数据库提交失败: {str(e)}'}), 500
@@ -868,6 +1171,17 @@ def handle_close_terminal(data):
     session_id = data.get('session_id')
     terminal_manager.close_connection(session_id)
     emit('terminal_closed', {'session_id': session_id})
+
+@socketio.on('resize_terminal')
+def handle_resize_terminal(data):
+    """处理终端大小调整"""
+    session_id = data.get('session_id')
+    cols = data.get('cols', 80)
+    rows = data.get('rows', 24)
+    
+    # 调用终端管理器的 resize 方法
+    if terminal_manager and hasattr(terminal_manager, 'resize_terminal'):
+        terminal_manager.resize_terminal(session_id, cols, rows)
 
 @socketio.on('upload_file')
 def handle_upload_file(data):

@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>设备使用管理系统</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>{{ systemTitle }}</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
     <script src="static/js/vue.global.js"></script>
     <script src="static/js/axios.min.js"></script>
@@ -23,12 +26,19 @@
             box-sizing: border-box;
         }
 
+        html {
+            overflow-x: hidden;  /* 禁止整个页面横向滚动 */
+            max-width: 100vw;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
             position: relative;
+            overflow-x: hidden;  /* 禁止 body 横向滚动 */
+            max-width: 100vw;
         }
         
         body::before {
@@ -848,6 +858,35 @@
             border-color: #f56565;
         }
 
+        /* 审计日志badge样式 */
+        .badge {
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge-success {
+            background: #f0fff4;
+            color: #22543d;
+        }
+
+        .badge-danger {
+            background: #fff5f5;
+            color: #742a2a;
+        }
+
+        .badge-primary {
+            background: #ebf8ff;
+            color: #2c5282;
+        }
+
+        .badge-warning {
+            background: #fffaf0;
+            color: #744210;
+        }
+
         .device-tags {
             display: flex;
             flex-wrap: wrap;
@@ -1038,6 +1077,11 @@
             align-items: center;
             z-index: 1000;
             animation: fadeIn 0.3s;
+        }
+
+        /* 快捷命令编辑弹窗需要更高的层级 */
+        .modal-overlay {
+            z-index: 10001;
         }
 
         @keyframes fadeIn {
@@ -1237,7 +1281,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            z-index: 2000;
+            z-index: 10001;
             animation: fadeIn 0.3s;
         }
 
@@ -1441,7 +1485,7 @@
         }
 
         .terminal-modal .modal-content {
-            max-width: 1200px;
+            max-width: min(1200px, calc(100vw - 40px));  /* 不超过视口宽度 */
             width: 95%;
             max-height: 90vh;
             padding: 0;
@@ -1522,7 +1566,6 @@
 
         .terminal-container {
             background: #000;
-            height: 600px;
             width: 100%;
             overflow: hidden;
             position: relative;
@@ -1554,32 +1597,86 @@
         }
 
         .terminal-modal .modal-content.maximized .terminal-container {
-            height: calc(100vh - 51px);
+            height: calc(100vh - 51px - 50px);  /* 减去 header 和快捷按钮区域高度 */
             width: 100%;
             flex: 1;
         }
 
+        /* 终端快捷命令按钮区域 */
+        .terminal-quick-commands {
+            display: flex;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #2d2d2d;
+            border-top: 1px solid #444;  /* 改为顶部边框 */
+            flex-wrap: wrap;
+            align-items: center;
+            min-height: 50px;
+            flex-shrink: 0;
+            z-index: 10;
+            position: relative;
+        }
+
+        .quick-cmd-btn {
+            padding: 6px 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .quick-cmd-btn:hover {
+            background: linear-gradient(135deg, #5568d3 0%, #653a8b 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .quick-cmd-btn:active {
+            transform: translateY(0);
+        }
+
         /* xterm.js 样式调整 */
         #xterm-container {
-            height: 100%;
+            height: 100%;  /* 使用父容器的完整高度 */
             width: 100%;
             padding: 0;
+            overflow: hidden;  /* 防止滚动条出现 */
+            box-sizing: border-box;
         }
 
         #xterm-container .xterm {
             height: 100% !important;
             width: 100% !important;
-            padding: 15px;
+            padding: 10px;  /* 减少 padding 避免溢出 */
+            box-sizing: border-box;
+            max-width: 100%;
+            overflow: hidden;
         }
         
         #xterm-container .xterm-viewport {
             background-color: #000 !important;
             width: 100% !important;
+            max-width: 100% !important;
+            overflow-y: auto !important;  /* 只允许垂直滚动 */
+            overflow-x: hidden !important;  /* 禁止水平滚动 */
         }
 
         #xterm-container .xterm-screen {
             height: 100%;
             width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        /* 强制所有 xterm 内部元素不溢出 */
+        #xterm-container .xterm-rows,
+        #xterm-container .xterm-helper-textarea {
+            max-width: 100% !important;
         }
 
         .upload-area {
@@ -1741,7 +1838,7 @@
             <div style="background: white; border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); padding: 60px; max-width: 480px; width: 100%;">
                 <div style="text-align: center;">
                     <div style="font-size: 64px; margin-bottom: 20px;">🖥️</div>
-                    <h1 style="color: #333; margin-bottom: 10px; font-size: 32px;">设备使用管理系统</h1>
+                    <h1 style="color: #333; margin-bottom: 10px; font-size: 32px;">{{ systemTitle }}</h1>
                     <p style="color: #666; margin-bottom: 30px; font-size: 16px;">{{ loginPageMode === 'user' ? '用户登录' : '管理员登录' }}</p>
                 </div>
                 
@@ -1796,7 +1893,15 @@
         <!-- 主界面 -->
         <div v-if="isInitialized">
             <div class="header">
-                <h1>🖥️ 设备使用管理系统</h1>
+                <h1>
+                    🖥️ {{ systemTitle }}
+                    <button v-if="isLoggedIn && currentUser.is_admin"
+                            @click="editSystemTitle"
+                            class="btn"
+                            style="padding: 4px 8px; font-size: 12px; margin-left: 10px; vertical-align: middle;">
+                        ✏️ 编辑
+                    </button>
+                </h1>
                 <div class="header-right">
                     <div class="connection-status">
                         <div class="status-dot" :class="connectionStatus === 'online' ? 'online' : 'offline'"></div>
@@ -1810,6 +1915,7 @@
                         <button class="nav-btn" :class="{active: currentView === 'devices'}" @click="currentView = 'devices'">设备列表</button>
                         <button class="nav-btn" :class="{active: currentView === 'records'}" @click="currentView = 'records'">使用记录</button>
                         <button class="nav-btn" :class="{active: currentView === 'users'}" @click="currentView = 'users'" v-if="isLoggedIn && currentUser.is_admin">用户管理</button>
+                        <button class="nav-btn" :class="{active: currentView === 'audit-logs'}" @click="currentView = 'audit-logs'" v-if="isLoggedIn && currentUser.is_admin">审计日志</button>
                         <button class="nav-btn" :class="{active: currentView === 'statistics'}" @click="currentView = 'statistics'">统计报表</button>
                     </div>
                     <div v-if="!isLoggedIn" style="display: flex; gap: 10px;">
@@ -2255,6 +2361,99 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 审计日志页面 -->
+            <div class="content" v-if="currentView === 'audit-logs' && isLoggedIn && currentUser.is_admin">
+                <div class="section-header">
+                    <h2>📋 审计日志</h2>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button class="btn btn-secondary" @click="refreshAuditLogs" style="padding: 8px 16px;">
+                            🔄 刷新
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 筛选条件 -->
+                <div style="background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                        <div class="form-group" style="margin: 0;">
+                            <label>操作类型</label>
+                            <select v-model="auditLogFilters.action_type" @change="loadAuditLogs(1)">
+                                <option value="">全部</option>
+                                <option value="admin_login">管理员登录</option>
+                                <option value="user_login">用户登录</option>
+                                <option value="device_add">添加设备</option>
+                                <option value="device_update">更新设备</option>
+                                <option value="device_delete">删除设备</option>
+                                <option value="device_batch_delete">批量删除设备</option>
+                                <option value="device_batch_import">批量导入设备</option>
+                                <option value="user_add">添加用户</option>
+                                <option value="user_delete">删除用户</option>
+                                <option value="user_batch_delete">批量删除用户</option>
+                                <option value="user_batch_import">批量导入用户</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label>操作人</label>
+                            <input v-model="auditLogFilters.operator" @input="loadAuditLogs(1)" placeholder="输入操作人搜索">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label>开始日期</label>
+                            <input v-model="auditLogFilters.start_date" @change="loadAuditLogs(1)" type="date">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label>结束日期</label>
+                            <input v-model="auditLogFilters.end_date" @change="loadAuditLogs(1)" type="date">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 日志列表 -->
+                <div v-if="auditLogs.length === 0" class="empty-state">
+                    <div class="empty-state-icon">📋</div>
+                    <p>暂无审计日志</p>
+                </div>
+
+                <div v-else style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">ID</th>
+                                <th style="width: 150px;">操作类型</th>
+                                <th style="width: 120px;">操作人</th>
+                                <th style="width: 120px;">IP地址</th>
+                                <th>操作详情</th>
+                                <th style="width: 160px;">操作时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="log in auditLogs" :key="log.id">
+                                <td>{{ log.id }}</td>
+                                <td>
+                                    <span class="badge" :class="getActionTypeBadgeClass(log.action_type)">
+                                        {{ getActionTypeLabel(log.action_type) }}
+                                    </span>
+                                </td>
+                                <td>{{ log.operator }}</td>
+                                <td>{{ log.ip_address || '-' }}</td>
+                                <td>
+                                    <div style="max-width: 400px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" :title="formatDetails(log.details)">
+                                        {{ formatDetails(log.details) }}
+                                    </div>
+                                </td>
+                                <td>{{ log.created_at }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <!-- 分页 -->
+                    <div v-if="auditLogPagination.pages > 1" class="pagination">
+                        <button @click="loadAuditLogs(auditLogPagination.page - 1)" :disabled="auditLogPagination.page === 1">上一页</button>
+                        <span>第 {{ auditLogPagination.page }} / {{ auditLogPagination.pages }} 页 (共 {{ auditLogPagination.total }} 条)</span>
+                        <button @click="loadAuditLogs(auditLogPagination.page + 1)" :disabled="auditLogPagination.page === auditLogPagination.pages">下一页</button>
+                    </div>
+                </div>
+            </div>
         </template>
 
         <!-- 添加/编辑设备模态框 -->
@@ -2413,6 +2612,7 @@
                         <button class="close-btn" @click="closeTerminal" title="关闭终端">×</button>
                     </div>
                 </div>
+                
                 <div 
                     ref="terminalContainer"
                     id="xterm-container"
@@ -2422,10 +2622,51 @@
                     @dragleave.prevent="handleTerminalDragLeave"
                 >
                 </div>
+                
+                <!-- 快捷命令按钮区域 -->
+                <div class="terminal-quick-commands">
+                    <button 
+                        v-for="(cmd, index) in quickCommands" 
+                        :key="index"
+                        class="quick-cmd-btn"
+                        @click="executeQuickCommand(cmd.command)"
+                        @contextmenu.prevent="editQuickCommand(index)"
+                        :title="'命令: ' + cmd.command + '\n右键编辑'"
+                    >
+                        {{ cmd.label }}
+                    </button>
+                </div>
             </div>
         </div>
 
         </div><!-- 主界面结束 -->
+
+        <!-- 编辑快捷命令弹窗 -->
+        <div v-if="showEditQuickCommand" class="modal-overlay">
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h3>✏️ 编辑快捷命令</h3>
+                    <button class="close-btn" @click="closeEditQuickCommand">×</button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveQuickCommand">
+                        <div class="form-group">
+                            <label>按钮标签 *</label>
+                            <input v-model="editCommandForm.label" type="text" placeholder="例如: ls -la" required maxlength="15">
+                            <small style="color: #999;">建议不超过 15 个字符</small>
+                        </div>
+                        <div class="form-group">
+                            <label>执行命令 *</label>
+                            <textarea v-model="editCommandForm.command" placeholder="例如: ls -la" required rows="3"></textarea>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">保存</button>
+                            <button type="button" class="btn btn-secondary" @click="closeEditQuickCommand">取消</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
 
         <!-- 自定义确认对话框 -->
         <div v-if="confirmDialog.show" class="confirm-dialog">
@@ -2463,6 +2704,7 @@
         createApp({
             data() {
                 return {
+                    systemTitle: '设备使用管理系统', // 默认标题，从配置中获取
                     isInitialized: false, // 是否已初始化（显示主界面）
                     loginPageMode: 'user', // 登录页模式：'user' 或 'admin'
                     isLoggedIn: false,
@@ -2579,6 +2821,26 @@
                         content: ''
                     },
                     
+                    // 终端快捷按钮配置
+                    quickCommands: [
+                        { label: 'ls -la', command: 'ls -la\n' },
+                        { label: 'pwd', command: 'pwd\n' },
+                        { label: 'top', command: 'top\n' },
+                        { label: 'df -h', command: 'df -h\n' },
+                        { label: 'free -h', command: 'free -h\n' },
+                        { label: 'ps aux', command: 'ps aux\n' },
+                        { label: 'netstat', command: 'netstat -tuln\n' },
+                        { label: 'whoami', command: 'whoami\n' },
+                        { label: 'clear', command: 'clear\n' },
+                        { label: 'exit', command: 'exit\n' }
+                    ],
+                    showEditQuickCommand: false,
+                    editingCommandIndex: null,
+                    editCommandForm: {
+                        label: '',
+                        command: ''
+                    },
+                    
                     confirmDialog: {
                         show: false,
                         title: '',
@@ -2594,6 +2856,21 @@
                         message: '',
                         type: 'success',
                         icon: '✅'
+                    },
+                    
+                    // 审计日志
+                    auditLogs: [],
+                    auditLogFilters: {
+                        action_type: '',
+                        operator: '',
+                        start_date: '',
+                        end_date: ''
+                    },
+                    auditLogPagination: {
+                        page: 1,
+                        per_page: 50,
+                        total: 0,
+                        pages: 0
                     },
                     
                     apiBaseUrl: '/api',
@@ -2724,6 +3001,22 @@
                     }
                 );
                 
+                // 加载系统配置
+                this.loadSystemConfig();
+                
+                // 加载保存的快捷命令
+                const savedCommands = localStorage.getItem('quickCommands');
+                if (savedCommands) {
+                    try {
+                        this.quickCommands = JSON.parse(savedCommands);
+                        console.log('已加载保存的快捷命令:', this.quickCommands);
+                    } catch (e) {
+                        console.error('加载快捷命令失败:', e);
+                    }
+                } else {
+                    console.log('使用默认快捷命令:', this.quickCommands);
+                }
+
                 // 检查是否已登录
                 const token = localStorage.getItem('token');
                 const user = localStorage.getItem('user');
@@ -2755,6 +3048,10 @@
                         this.$nextTick(() => {
                             this.renderCharts();
                         });
+                    }
+                    // 切换到审计日志时加载数据
+                    if (newView === 'audit-logs') {
+                        this.loadAuditLogs(1);
                     }
                 }
             },
@@ -2899,7 +3196,7 @@
                         this.showUserLoginPassword = false; // 重置密码可见状态
                         this.showMessage('登录成功', `欢迎回来，${user.chinese_name}！`, 'success');
                         
-                        this.loadAllData();
+                        await this.loadAllData();
                     } catch (error) {
                         console.error('用户登录失败：', error);
                         const message = error.response?.data?.message || '登录失败，请检查账号和密码';
@@ -2954,12 +3251,12 @@
                     this.showConfirmPassword = false;
                 },
                 
-                loadAllData() {
-                    this.loadDevices();
-                    this.loadRecords();
-                    this.loadStatistics();
+                async loadAllData() {
+                    await this.loadDevices();
+                    await this.loadRecords();
+                    await this.loadStatistics();
                     if (this.isLoggedIn) {
-                        this.loadAllowedUsers();
+                        await this.loadAllowedUsers();
                     }
                 },
                 
@@ -3131,6 +3428,93 @@
                             }
                         });
                     }
+                },
+                
+                // ==================== 审计日志相关方法 ====================
+                
+                async loadAuditLogs(page = 1) {
+                    try {
+                        const params = {
+                            page: page,
+                            per_page: this.auditLogPagination.per_page
+                        };
+                        
+                        if (this.auditLogFilters.action_type) {
+                            params.action_type = this.auditLogFilters.action_type;
+                        }
+                        if (this.auditLogFilters.operator) {
+                            params.operator = this.auditLogFilters.operator;
+                        }
+                        if (this.auditLogFilters.start_date) {
+                            params.start_date = this.auditLogFilters.start_date;
+                        }
+                        if (this.auditLogFilters.end_date) {
+                            params.end_date = this.auditLogFilters.end_date;
+                        }
+                        
+                        const response = await axios.get(`${this.apiBaseUrl}/audit-logs`, { params });
+                        this.auditLogs = response.data.logs;
+                        this.auditLogPagination = {
+                            page: response.data.page,
+                            per_page: response.data.per_page,
+                            total: response.data.total,
+                            pages: response.data.pages
+                        };
+                    } catch (error) {
+                        console.error('加载审计日志失败：', error);
+                        this.showMessage('加载失败', '审计日志加载失败', 'error');
+                    }
+                },
+                
+                refreshAuditLogs() {
+                    this.loadAuditLogs(1);
+                },
+                
+                getActionTypeLabel(actionType) {
+                    const labels = {
+                        'admin_login': '管理员登录',
+                        'admin_login_failed': '管理员登录失败',
+                        'user_login': '用户登录',
+                        'user_login_failed': '用户登录失败',
+                        'device_add': '添加设备',
+                        'device_update': '更新设备',
+                        'device_delete': '删除设备',
+                        'device_batch_delete': '批量删除设备',
+                        'device_batch_import': '批量导入设备',
+                        'user_add': '添加用户',
+                        'user_delete': '删除用户',
+                        'user_batch_delete': '批量删除用户',
+                        'user_batch_import': '批量导入用户'
+                    };
+                    return labels[actionType] || actionType;
+                },
+                
+                getActionTypeBadgeClass(actionType) {
+                    if (actionType.includes('login') && !actionType.includes('failed')) {
+                        return 'badge-success';
+                    } else if (actionType.includes('failed')) {
+                        return 'badge-danger';
+                    } else if (actionType.includes('delete')) {
+                        return 'badge-danger';
+                    } else if (actionType.includes('add') || actionType.includes('import')) {
+                        return 'badge-primary';
+                    } else if (actionType.includes('update')) {
+                        return 'badge-warning';
+                    }
+                    return '';
+                },
+                
+                formatDetails(details) {
+                    if (!details) return '-';
+                    if (typeof details === 'string') return details;
+                    
+                    // 格式化JSON对象为可读字符串
+                    const parts = [];
+                    for (const [key, value] of Object.entries(details)) {
+                        if (key === 'status' || key === 'message' || key === 'reason') continue;
+                        parts.push(`${key}: ${value}`);
+                    }
+                    return parts.join(', ') || JSON.stringify(details);
                 },
                 
                 extractAllTags() {
@@ -3926,6 +4310,8 @@
                     this.terminalPosition = { x: 0, y: 0 };
                     this.showTerminalModal = true;
                     
+                    console.log('打开终端，快捷命令数量:', this.quickCommands.length);
+                    
                     // 等待DOM更新后初始化终端
                     this.$nextTick(() => {
                         // 确保弹窗transform正确
@@ -4053,8 +4439,11 @@
                             cursorAccent: '#00ff00',
                             selection: 'rgba(255, 255, 255, 0.3)'
                         },
+                        // 设置初始值，实际大小由 FitAddon 自动调整
                         cols: 80,
-                        rows: 24
+                        rows: 24,
+                        scrollback: 1000,  // 滚动缓冲区
+                        convertEol: true   // 自动转换行尾
                     });
                     
                     // 创建FitAddon用于自适应大小
@@ -4065,7 +4454,23 @@
                     const container = document.getElementById('xterm-container');
                     container.innerHTML = ''; // 清空容器
                     this.term.open(container);
-                    this.fitAddon.fit();
+                    
+                    // 延迟调用 fit() 确保容器已完全渲染
+                    this.$nextTick(() => {
+                        setTimeout(() => {
+                            if (this.fitAddon) {
+                                this.fitAddon.fit();
+                                // 通知后端终端大小变化
+                                if (this.socket && this.terminalSessionId) {
+                                    this.socket.emit('resize_terminal', {
+                                        session_id: this.terminalSessionId,
+                                        cols: this.term.cols,
+                                        rows: this.term.rows
+                                    });
+                                }
+                            }
+                        }, 100);
+                    });
                     
                     // 聚焦终端
                     this.term.focus();
@@ -4081,11 +4486,22 @@
                     });
                     
                     // 窗口大小改变时自适应
-                    window.addEventListener('resize', () => {
-                        if (this.fitAddon) {
-                            this.fitAddon.fit();
+                    const resizeHandler = () => {
+                        if (this.fitAddon && this.term) {
+                            setTimeout(() => {
+                                this.fitAddon.fit();
+                                // 通知后端终端大小变化
+                                if (this.socket && this.terminalSessionId) {
+                                    this.socket.emit('resize_terminal', {
+                                        session_id: this.terminalSessionId,
+                                        cols: this.term.cols,
+                                        rows: this.term.rows
+                                    });
+                                }
+                            }, 100);
                         }
-                    });
+                    };
+                    window.addEventListener('resize', resizeHandler);
                 },
                 
                 closeTerminal() {
@@ -4113,6 +4529,60 @@
                     this.terminalPosition = { x: 0, y: 0 };
                 },
 
+                // 执行快捷命令
+                executeQuickCommand(command) {
+                    if (this.term && this.socket && this.terminalSessionId) {
+                        // 发送到终端（不自动添加换行符）
+                        this.socket.emit('terminal_input', {
+                            session_id: this.terminalSessionId,
+                            data: command
+                        });
+                        // 聚焦终端
+                        this.term.focus();
+                    }
+                },
+
+                // 编辑快捷命令
+                editQuickCommand(index) {
+                    this.editingCommandIndex = index;
+                    const cmd = this.quickCommands[index];
+                    this.editCommandForm = {
+                        label: cmd.label,
+                        command: cmd.command
+                    };
+                    this.showEditQuickCommand = true;
+                },
+
+                // 保存快捷命令
+                saveQuickCommand() {
+                    // 验证标签和命令不为空（去除空白后检查）
+                    if (!this.editCommandForm.label.trim() || !this.editCommandForm.command.replace(/\s/g, '')) {
+                        this.showMessage('验证失败', '标签和命令都不能为空', 'error');
+                        return;
+                    }
+
+                    this.quickCommands[this.editingCommandIndex] = {
+                        label: this.editCommandForm.label.trim(),
+                        command: this.editCommandForm.command  // 保留原始内容，包括换行符
+                    };
+
+                    // 保存到 localStorage
+                    localStorage.setItem('quickCommands', JSON.stringify(this.quickCommands));
+
+                    this.showMessage('保存成功', '快捷命令已更新', 'success');
+                    this.closeEditQuickCommand();
+                },
+
+                // 关闭编辑快捷命令弹窗
+                closeEditQuickCommand() {
+                    this.showEditQuickCommand = false;
+                    this.editingCommandIndex = null;
+                    this.editCommandForm = {
+                        label: '',
+                        command: ''
+                    };
+                },
+
                 toggleMaximizeTerminal() {
                     this.terminalMaximized = !this.terminalMaximized;
                     
@@ -4131,17 +4601,41 @@
                             // 第一次调整
                             setTimeout(() => {
                                 this.fitAddon.fit();
+                                // 通知后端终端大小变化
+                                if (this.socket && this.terminalSessionId) {
+                                    this.socket.emit('resize_terminal', {
+                                        session_id: this.terminalSessionId,
+                                        cols: this.term.cols,
+                                        rows: this.term.rows
+                                    });
+                                }
                             }, 50);
                             
                             // 第二次调整（确保CSS动画完成）
                             setTimeout(() => {
                                 this.fitAddon.fit();
                                 this.term.focus();
+                                // 再次通知后端
+                                if (this.socket && this.terminalSessionId) {
+                                    this.socket.emit('resize_terminal', {
+                                        session_id: this.terminalSessionId,
+                                        cols: this.term.cols,
+                                        rows: this.term.rows
+                                    });
+                                }
                             }, 200);
                             
                             // 第三次调整（最终确认）
                             setTimeout(() => {
                                 this.fitAddon.fit();
+                                // 最终通知后端
+                                if (this.socket && this.terminalSessionId) {
+                                    this.socket.emit('resize_terminal', {
+                                        session_id: this.terminalSessionId,
+                                        cols: this.term.cols,
+                                        rows: this.term.rows
+                                    });
+                                }
                             }, 400);
                         }
                     });
@@ -4339,6 +4833,55 @@
                     };
                     
                     reader.readAsDataURL(file);
+                },
+                
+                // 加载系统配置
+                async loadSystemConfig() {
+                    try {
+                        const response = await axios.get(`${this.apiBaseUrl}/config`);
+                        this.systemTitle = response.data.system.title;
+                        document.title = this.systemTitle;  // 更新浏览器标签页标题
+                    } catch (error) {
+                        console.error('加载系统配置失败：', error);
+                        // 保持默认标题
+                    }
+                },
+                
+                // 编辑系统标题
+                editSystemTitle() {
+                    // 检查管理员权限
+                    if (!this.isLoggedIn || !this.currentUser.is_admin) {
+                        this.showMessage('权限不足', '只有管理员才能修改系统标题', 'error');
+                        return;
+                    }
+                    
+                    // 弹出输入框
+                    const newTitle = prompt('请输入新的系统标题', this.systemTitle);
+                    if (newTitle === null) return;  // 用户点击取消
+                    
+                    // 验证新标题
+                    const title = newTitle.trim();
+                    if (!title) {
+                        this.showMessage('验证失败', '标题不能为空', 'error');
+                        return;
+                    }
+                    
+                    // 更新标题
+                    this.updateSystemTitle(title);
+                },
+                
+                // 更新系统标题
+                async updateSystemTitle(title) {
+                    try {
+                        const response = await axios.put(`${this.apiBaseUrl}/config/system/title`, {
+                            title: title
+                        });
+                        this.systemTitle = title;
+                        document.title = title;
+                        this.showMessage('更新成功', response.data.message, 'success');
+                    } catch (error) {
+                        this.showMessage('更新失败', error.response?.data?.message || error.message, 'error');
+                    }
                 },
                 
                 dragOver(e) {
