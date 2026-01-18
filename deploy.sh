@@ -308,66 +308,68 @@ install_python_deps() {
     deactivate
 }
 
-# 初始化数据库（交互式）
+# 初始化/迁移数据库（自动化）
 init_database() {
-    log_step "数据库初始化（可选）..."
+    log_step "数据库检查与迁移..."
     
     cd "$DEPLOY_DIR"
     
-    if [ ! -f "init_db.py" ]; then
-        log_warn "init_db.py 不存在，跳过数据库初始化"
-        return 0
-    fi
-    
-    # 检查是否已存在数据库文件（使用相对路径，因为已经 cd 到 DEPLOY_DIR）
+    # 检查是否已存在数据库文件
     DB_FILE="backend/device_manager.db"
+    
     if [ -f "$DB_FILE" ]; then
         echo ""
-        log_warn "⚠️  检测到已存在的数据库文件: $(pwd)/$DB_FILE"
-        log_warn "⚠️  数据库初始化将删除所有现有数据（包括设备、用户、使用记录等）"
+        log_info "检测到已存在的数据库文件: $(pwd)/$DB_FILE"
+        log_info "将自动检查并升级数据库表结构（保留所有现有数据）"
         echo ""
-        read -p "是否要重新初始化数据库? [y/N]: " INIT_DB
-    else
-        echo ""
-        log_info "未检测到数据库文件: $(pwd)/$DB_FILE"
-        log_info "建议进行初始化以创建数据库表和管理员账号"
-        read -p "是否初始化数据库? [Y/n]: " INIT_DB
-        INIT_DB=${INIT_DB:-Y}
-    fi
-    
-    INIT_DB=${INIT_DB:-N}
-    
-    if [[ $INIT_DB =~ ^[Yy]$ ]]; then
-        log_info "正在初始化数据库..."
-        source .venv/bin/activate
-        python3 init_db.py
-        deactivate
-        log_info "数据库初始化完成"
-    else
-        log_info "跳过数据库初始化"
-        if [ -f "backend/device_manager.db" ]; then
-            log_info "将使用现有数据库"
-            
-            # 检查是否需要升级数据库
-            if [ -f "update_db_add_login_info.py" ]; then
-                echo ""
-                log_warn "⚠️  检测到数据库升级脚本: update_db_add_login_info.py"
-                log_info "如果您恢复了旧版本的数据库，建议运行升级脚本以添加登录信息功能"
-                read -p "是否运行数据库升级脚本? [Y/n]: " RUN_UPGRADE
-                RUN_UPGRADE=${RUN_UPGRADE:-Y}
-                
-                if [[ $RUN_UPGRADE =~ ^[Yy]$ ]]; then
-                    log_info "正在升级数据库..."
-                    source .venv/bin/activate
+        read -p "是否运行数据库迁移? [Y/n]: " RUN_MIGRATE
+        RUN_MIGRATE=${RUN_MIGRATE:-Y}
+        
+        if [[ $RUN_MIGRATE =~ ^[Yy]$ ]]; then
+            # 使用智能迁移脚本（自动检测并添加缺失的表和字段）
+            if [ -f "migrate_db.py" ]; then
+                log_info "正在运行数据库迁移..."
+                source .venv/bin/activate
+                python3 migrate_db.py
+                deactivate
+                log_info "数据库迁移完成"
+            else
+                log_warn "migrate_db.py 不存在，尝试使用旧版升级脚本..."
+                source .venv/bin/activate
+                if [ -f "update_db_add_login_info.py" ]; then
                     python3 update_db_add_login_info.py
-                    deactivate
-                    log_info "数据库升级完成"
-                else
-                    log_info "跳过数据库升级"
                 fi
+                deactivate
             fi
         else
-            log_warn "注意：未初始化数据库，首次运行可能会自动创建数据库表"
+            log_info "跳过数据库迁移"
+            log_warn "警告：如果代码更新了数据库结构，可能导致功能异常"
+        fi
+        
+        echo ""
+        log_warn "如需完全重建数据库（将删除所有数据），请手动运行: python3 init_db.py"
+        
+    else
+        # 数据库不存在，直接运行迁移脚本（会自动创建）
+        echo ""
+        log_info "未检测到数据库文件: $(pwd)/$DB_FILE"
+        log_info "将创建新数据库并初始化表结构"
+        echo ""
+        
+        if [ -f "migrate_db.py" ]; then
+            log_info "正在创建数据库..."
+            source .venv/bin/activate
+            python3 migrate_db.py
+            deactivate
+            log_info "数据库创建完成"
+        elif [ -f "init_db.py" ]; then
+            log_info "正在初始化数据库..."
+            source .venv/bin/activate
+            python3 init_db.py
+            deactivate
+            log_info "数据库初始化完成"
+        else
+            log_warn "未找到数据库初始化脚本，首次运行时将自动创建"
         fi
     fi
 }

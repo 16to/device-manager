@@ -12,22 +12,30 @@
 
 ### 解决方案
 
-#### 方法1：自动检查和修复（推荐）
+#### 方法1：智能数据库迁移（推荐）⭐
+```bash
+cd /path/to/device-manager
+python3 migrate_db.py
+```
+
+该脚本会：
+- ✅ 自动检测所有表的结构差异
+- ✅ 自动添加缺失的表和字段（包括 `login_info`）
+- ✅ 完全保留所有现有数据
+- ✅ 提供详细的迁移报告
+
+#### 方法2：快速检查修复
 ```bash
 cd /path/to/device-manager
 python3 check_and_fix_db.py
 ```
 
-该脚本会：
-- ✅ 检查数据库是否包含所有必需的字段
-- ✅ 自动添加缺失的 `login_info` 字段
-- ✅ 显示数据库统计信息
-
-#### 方法2：手动添加字段
+#### 方法3：手动添加字段（已废弃）
 ```bash
 cd /path/to/device-manager
 python3 update_db_add_login_info.py
 ```
+注意：此方法只能添加 `login_info` 字段，不推荐使用
 
 #### 方法3：完全重新初始化（会删除所有数据）
 ```bash
