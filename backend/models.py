@@ -52,6 +52,7 @@ class UsageRecord(db.Model):
     purpose = db.Column(db.Text)  # 使用目的
     start_time = db.Column(db.DateTime, default=datetime.now)
     end_time = db.Column(db.DateTime)
+    login_info = db.Column(db.Text)  # Linux登录信息（通过who/w命令获取）
     
     def get_duration(self):
         """计算使用时长（小时）"""

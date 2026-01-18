@@ -1897,15 +1897,16 @@
         <!-- 主界面 -->
         <div v-if="isInitialized">
             <div class="header">
-                <h1>
-                    🖥️ {{ systemTitle }}
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h1 style="margin: 0;">🖥️ {{ systemTitle }}</h1>
                     <button v-if="isLoggedIn && currentUser.is_admin"
                             @click="editSystemTitle"
-                            class="btn"
-                            style="padding: 4px 8px; font-size: 12px; margin-left: 10px; vertical-align: middle;">
-                        ✏️ 编辑
+                            class="btn btn-secondary"
+                            style="padding: 6px 12px; font-size: 13px; min-width: 70px;"
+                            title="编辑系统名称">
+                        <span style="margin-right: 4px;">✏️</span>编辑
                     </button>
-                </h1>
+                </div>
                 <div class="header-right">
                     <div class="connection-status">
                         <div class="status-dot" :class="connectionStatus === 'online' ? 'online' : 'offline'"></div>
@@ -2205,6 +2206,7 @@
                                     {{ recordSortOrder === 'asc' ? '↑' : '↓' }}
                                 </span>
                             </th>
+                            <th>登录信息</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2220,6 +2222,17 @@
                             <td>{{ record.start_time }}</td>
                             <td>{{ record.end_time || '使用中' }}</td>
                             <td>{{ record.duration }}</td>
+                            <td>
+                                <button 
+                                    v-if="record.login_info" 
+                                    class="btn btn-secondary" 
+                                    style="padding: 4px 12px; font-size: 12px;"
+                                    @click="showLoginInfo(record)"
+                                    title="查看Linux登录信息">
+                                    🖥️ 查看
+                                </button>
+                                <span v-else style="color: #999;">-</span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -2609,10 +2622,6 @@
                         {{ terminalInfo.title }}
                     </h3>
                     <div class="modal-header-buttons">
-                        <button class="maximize-btn" @click="toggleMaximizeTerminal" :title="terminalMaximized ? '还原' : '最大化'">
-                            <span v-if="terminalMaximized">▣</span>
-                            <span v-else>▢</span>
-                        </button>
                         <button class="close-btn" @click="closeTerminal" title="关闭终端">×</button>
                     </div>
                 </div>
@@ -2644,6 +2653,28 @@
         </div>
 
         </div><!-- 主界面结束 -->
+
+        <!-- 登录信息查看弹窗 -->
+        <div v-if="showLoginInfoModal" class="modal">
+            <div class="modal-content" style="max-width: 800px;">
+                <div class="modal-header">
+                    <h3>🖥️ Linux 登录信息</h3>
+                    <button class="close-btn" @click="showLoginInfoModal = false">×</button>
+                </div>
+                <div class="modal-body">
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f7fafc; border-radius: 5px;">
+                        <strong>设备：</strong>{{ currentLoginInfo.device_name }}<br>
+                        <strong>用户：</strong>{{ currentLoginInfo.user_name }}
+                        <span v-if="currentLoginInfo.user_account" style="color: #667eea;">({{ currentLoginInfo.user_account }})</span><br>
+                        <strong>占用时间：</strong>{{ currentLoginInfo.start_time }}
+                    </div>
+                    <pre style="background: #1a202c; color: #00ff00; padding: 15px; border-radius: 5px; overflow-x: auto; font-family: 'Courier New', monospace; font-size: 13px; line-height: 1.5; max-height: 500px;">{{ currentLoginInfo.login_info }}</pre>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" @click="showLoginInfoModal = false">关闭</button>
+                </div>
+            </div>
+        </div>
 
         <!-- 编辑快捷命令弹窗 -->
         <div v-if="showEditQuickCommand" class="modal-overlay">
@@ -2843,6 +2874,16 @@
                     editCommandForm: {
                         label: '',
                         command: ''
+                    },
+                    
+                    // 登录信息查看
+                    showLoginInfoModal: false,
+                    currentLoginInfo: {
+                        device_name: '',
+                        user_name: '',
+                        user_account: '',
+                        start_time: '',
+                        login_info: ''
                     },
                     
                     confirmDialog: {
@@ -4309,8 +4350,8 @@
                     this.terminalInfo = {
                         title: `${connType} - ${device.name} (${connection.ip}:${connection.port})`
                     };
-                    // 重置弹窗状态
-                    this.terminalMaximized = false;
+                    // 直接设置为最大化
+                    this.terminalMaximized = true;
                     this.terminalPosition = { x: 0, y: 0 };
                     this.showTerminalModal = true;
                     
@@ -4381,8 +4422,8 @@
                     this.terminalInfo = {
                         title: `Telnet - ${device.name} (${connection.ip}:${connection.port})`
                     };
-                    // 重置弹窗状态
-                    this.terminalMaximized = false;
+                    // 直接设置为最大化
+                    this.terminalMaximized = true;
                     this.terminalPosition = { x: 0, y: 0 };
                     this.showTerminalModal = true;
                     
@@ -4447,7 +4488,8 @@
                         cols: 80,
                         rows: 24,
                         scrollback: 1000,  // 滚动缓冲区
-                        convertEol: true   // 自动转换行尾
+                        convertEol: true,  // 自动转换行尾
+                        allowProposedApi: true  // 允许使用提议的API
                     });
                     
                     // 创建FitAddon用于自适应大小
@@ -4478,6 +4520,47 @@
                     
                     // 聚焦终端
                     this.term.focus();
+                    
+                    // 添加复制功能支持
+                    // 监听右键菜单（右键复制选中内容）
+                    container.addEventListener('contextmenu', (e) => {
+                        const selection = this.term.getSelection();
+                        if (selection) {
+                            e.preventDefault();
+                            navigator.clipboard.writeText(selection).then(() => {
+                                console.log('已复制到剪贴板');
+                            }).catch(err => {
+                                console.error('复制失败:', err);
+                            });
+                        }
+                    });
+                    
+                    // 添加键盘快捷键支持 (Ctrl+C / Cmd+C 复制)
+                    this.term.attachCustomKeyEventHandler((event) => {
+                        // Ctrl+C (Windows/Linux) 或 Cmd+C (Mac)
+                        if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+                            const selection = this.term.getSelection();
+                            if (selection) {
+                                event.preventDefault();
+                                navigator.clipboard.writeText(selection);
+                                return false;
+                            }
+                        }
+                        // Ctrl+V (Windows/Linux) 或 Cmd+V (Mac) 粘贴
+                        if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+                            event.preventDefault();
+                            navigator.clipboard.readText().then(text => {
+                                if (this.socket && this.terminalSessionId) {
+                                    this.socket.emit('terminal_input', {
+                                        session_id: this.terminalSessionId,
+                                        data: text
+                                    });
+                                }
+                            });
+                            return false;
+                        }
+                        return true;
+                    });
                     
                     // 监听用户输入
                     this.term.onData(data => {
@@ -4585,6 +4668,18 @@
                         label: '',
                         command: ''
                     };
+                },
+                
+                // 显示登录信息
+                showLoginInfo(record) {
+                    this.currentLoginInfo = {
+                        device_name: record.device_name,
+                        user_name: record.user_name,
+                        user_account: record.user_account,
+                        start_time: record.start_time,
+                        login_info: record.login_info || '无登录信息'
+                    };
+                    this.showLoginInfoModal = true;
                 },
 
                 toggleMaximizeTerminal() {

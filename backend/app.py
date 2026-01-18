@@ -684,6 +684,94 @@ def batch_import_devices():
 
 # ==================== 设备占用 API ====================
 
+def get_linux_login_info(device):
+    """通过SSH获取Linux登录信息"""
+    import paramiko
+    import socket
+    
+    # 如果设备没有配置SSH连接信息，返回空
+    if not device.ssh_connections:
+        return None
+    
+    try:
+        ssh_connections = json.loads(device.ssh_connections)
+        if not ssh_connections:
+            return None
+        
+        # 使用第一个SSH连接配置
+        ssh_conn = ssh_connections[0]
+        host = ssh_conn.get('ip')
+        port = int(ssh_conn.get('port', 22))
+        username = device.username
+        password = device.password
+        
+        if not all([host, username, password]):
+            return None
+        
+        # 创建SSH客户端
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        # 连接超时设置为5秒
+        ssh.connect(
+            hostname=host,
+            port=port,
+            username=username,
+            password=password,
+            timeout=5,
+            banner_timeout=5,
+            auth_timeout=5
+        )
+        
+        # 1. 执行who命令获取当前登录用户
+        stdin, stdout, stderr = ssh.exec_command('who')
+        who_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        
+        # 2. 执行w命令获取详细信息
+        stdin, stdout, stderr = ssh.exec_command('w')
+        w_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        
+        # 3. 执行last -n 30命令获取最近30次登录历史（包含IP地址）
+        stdin, stdout, stderr = ssh.exec_command('last -n 30 -a')
+        last_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        
+        # 4. 执行lastlog命令获取所有用户的最后登录信息
+        stdin, stdout, stderr = ssh.exec_command('lastlog | head -n 50')
+        lastlog_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        
+        # 5. 执行who -a命令获取更详细的当前登录信息
+        stdin, stdout, stderr = ssh.exec_command('who -a')
+        who_a_output = stdout.read().decode('utf-8', errors='ignore').strip()
+        
+        # 关闭连接
+        ssh.close()
+        
+        # 组合信息
+        login_info_parts = []
+        
+        if who_output:
+            login_info_parts.append(f"=== 当前登录用户 (who) ===\n{who_output}")
+        
+        if who_a_output:
+            login_info_parts.append(f"\n=== 详细当前登录 (who -a) ===\n{who_a_output}")
+        
+        if w_output:
+            login_info_parts.append(f"\n=== 用户活动信息 (w) ===\n{w_output}")
+        
+        if last_output:
+            login_info_parts.append(f"\n=== 最近30次登录历史 (last -n 30 -a) ===\n{last_output}")
+        
+        if lastlog_output:
+            login_info_parts.append(f"\n=== 用户最后登录信息 (lastlog) ===\n{lastlog_output}")
+        
+        login_info = '\n'.join(login_info_parts) if login_info_parts else "未获取到登录信息"
+        return login_info
+        
+    except (paramiko.SSHException, socket.error, Exception) as e:
+        # SSH连接失败，记录错误但不影响占用流程
+        print(f"获取登录信息失败: {str(e)}")
+        return f"获取登录信息失败: {str(e)}"
+
 @app.route('/api/devices/<int:device_id>/occupy', methods=['POST'])
 def occupy_device(device_id):
     """占用设备"""
@@ -710,6 +798,9 @@ def occupy_device(device_id):
     # 限制时长范围：1-48小时
     duration = max(1, min(48, int(duration)))
     
+    # 获取Linux登录信息
+    login_info = get_linux_login_info(device)
+    
     # 更新设备状态
     device.status = 'occupied'
     device.current_user = user_name
@@ -723,7 +814,8 @@ def occupy_device(device_id):
         user_name=user_name,
         user_account=user_account,
         purpose=purpose,
-        start_time=datetime.now()
+        start_time=datetime.now(),
+        login_info=login_info
     )
     
     db.session.add(record)
@@ -778,7 +870,8 @@ def get_records():
         'purpose': r.purpose,
         'start_time': r.start_time.strftime('%Y-%m-%d %H:%M:%S') if r.start_time else None,
         'end_time': r.end_time.strftime('%Y-%m-%d %H:%M:%S') if r.end_time else None,
-        'duration': r.get_duration()
+        'duration': r.get_duration(),
+        'login_info': r.login_info
     } for r in records])
 
 @app.route('/api/records/<int:device_id>', methods=['GET'])
@@ -794,7 +887,8 @@ def get_device_records(device_id):
         'purpose': r.purpose,
         'start_time': r.start_time.strftime('%Y-%m-%d %H:%M:%S') if r.start_time else None,
         'end_time': r.end_time.strftime('%Y-%m-%d %H:%M:%S') if r.end_time else None,
-        'duration': r.get_duration()
+        'duration': r.get_duration(),
+        'login_info': r.login_info
     } for r in records])
 
 # ==================== 报表统计 API ====================
