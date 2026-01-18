@@ -1,5 +1,7 @@
 # 🚀 部署指南
 
+> **⚠️ 重要提示**: 如果在重新部署后登录信息功能不可用，请查看 [登录信息故障排除指南](TROUBLESHOOTING_LOGIN_INFO.md)
+
 ## 📦 环境要求
 
 - **Python 版本**: Python 3.8 或更高版本
@@ -110,7 +112,7 @@ python3 app.py
 - 每次部署都会创建全新的空数据库
 - 如需保留数据，请在部署前手动备份数据库文件
 
-### 数据备份
+### 数据备份与恢复
 
 ```bash
 # 备份数据库
@@ -118,8 +120,18 @@ cp backend/device_manager.db ~/backup/device_manager_$(date +%Y%m%d).db
 
 # 恢复数据库
 cp ~/backup/device_manager_20250104.db backend/device_manager.db
+
+# ⚠️ 重要：恢复旧数据库后，需要运行数据库升级脚本
+python3 update_db_add_login_info.py
+
+# 然后重启服务
 sudo systemctl restart device-manager
 ```
+
+**注意**：
+- 如果恢复的是旧版本的数据库备份，必须运行 `update_db_add_login_info.py` 升级脚本
+- 该脚本会为 `usage_records` 表添加 `login_info` 字段（如果不存在）
+- 升级脚本是幂等的，多次运行不会造成问题
 
 ## 🐛 常见问题解决
 

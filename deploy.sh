@@ -347,6 +347,25 @@ init_database() {
         log_info "跳过数据库初始化"
         if [ -f "backend/device_manager.db" ]; then
             log_info "将使用现有数据库"
+            
+            # 检查是否需要升级数据库
+            if [ -f "update_db_add_login_info.py" ]; then
+                echo ""
+                log_warn "⚠️  检测到数据库升级脚本: update_db_add_login_info.py"
+                log_info "如果您恢复了旧版本的数据库，建议运行升级脚本以添加登录信息功能"
+                read -p "是否运行数据库升级脚本? [Y/n]: " RUN_UPGRADE
+                RUN_UPGRADE=${RUN_UPGRADE:-Y}
+                
+                if [[ $RUN_UPGRADE =~ ^[Yy]$ ]]; then
+                    log_info "正在升级数据库..."
+                    source .venv/bin/activate
+                    python3 update_db_add_login_info.py
+                    deactivate
+                    log_info "数据库升级完成"
+                else
+                    log_info "跳过数据库升级"
+                fi
+            fi
         else
             log_warn "注意：未初始化数据库，首次运行可能会自动创建数据库表"
         fi

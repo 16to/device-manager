@@ -105,11 +105,27 @@ device-manager/
 1. 系统使用SQLite数据库，数据文件保存在 `backend/device_manager.db`
 2. 首次运行会自动创建空数据库表和默认管理员账号
 3. 数据库文件不会被提交到git，部署时会创建全新的空数据库
-4. 建议在Chrome、Firefox、Safari等现代浏览器中使用
-5. 生产环境部署时，请修改默认管理员密码（在 config.json 中）
-6. 系统前后端已合并，统一使用3001端口
-7. 可在 config.json 中修改端口等配置
-8. 所有静态资源已本地化，无需依赖外部CDN
+4. **重要**：如果恢复旧版本数据库，请运行 `python3 check_and_fix_db.py` 检查并修复数据库结构
+5. 建议在Chrome、Firefox、Safari等现代浏览器中使用
+6. 生产环境部署时，请修改默认管理员密码（在 config.json 中）
+7. 系统前后端已合并，统一使用3001端口
+8. 可在 config.json 中修改端口等配置
+9. 所有静态资源已本地化，无需依赖外部CDN
+
+## 🔧 数据库维护
+
+### 检查和修复数据库
+如果遇到数据库字段缺失问题（例如登录信息功能不可用），可以运行：
+```bash
+python3 check_and_fix_db.py
+```
+该脚本会自动检查数据库结构，并修复缺失的字段。
+
+### 手动升级数据库
+如果需要添加登录信息字段：
+```bash
+python3 update_db_add_login_info.py
+```
 
 ## 📝 许可证
 MIT License
