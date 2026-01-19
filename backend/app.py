@@ -689,14 +689,14 @@ def get_linux_login_info(device):
     import paramiko
     import socket
     
-    # 如果设备没有配置SSH连接信息，返回空
+    # 如果设备没有配置SSH连接信息，返回提示信息
     if not device.ssh_connections:
-        return None
+        return "该设备未配置SSH连接信息，无法获取登录信息"
     
     try:
         ssh_connections = json.loads(device.ssh_connections)
         if not ssh_connections:
-            return None
+            return "该设备未配置SSH连接信息，无法获取登录信息"
         
         # 使用第一个SSH连接配置
         ssh_conn = ssh_connections[0]
@@ -706,11 +706,13 @@ def get_linux_login_info(device):
         password = device.password
         
         if not all([host, username, password]):
-            return None
+            return f"SSH连接配置不完整 (host={host}, port={port}, username={'已配置' if username else '未配置'}, password={'已配置' if password else '未配置'})"
         
         # 创建SSH客户端
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        print(f"[DEBUG] 尝试SSH连接: {username}@{host}:{port}")
         
         # 连接超时设置为5秒
         ssh.connect(
@@ -722,6 +724,8 @@ def get_linux_login_info(device):
             banner_timeout=5,
             auth_timeout=5
         )
+        
+        print(f"[DEBUG] SSH连接成功，开始获取登录信息")
         
         # 1. 执行who命令获取当前登录用户
         stdin, stdout, stderr = ssh.exec_command('who')
@@ -746,6 +750,8 @@ def get_linux_login_info(device):
         # 关闭连接
         ssh.close()
         
+        print(f"[DEBUG] 成功执行所有命令，组合结果")
+        
         # 组合信息
         login_info_parts = []
         
@@ -764,13 +770,26 @@ def get_linux_login_info(device):
         if lastlog_output:
             login_info_parts.append(f"\n=== 用户最后登录信息 (lastlog) ===\n{lastlog_output}")
         
-        login_info = '\n'.join(login_info_parts) if login_info_parts else "未获取到登录信息"
+        login_info = '\n'.join(login_info_parts) if login_info_parts else "未获取到登录信息（所有命令输出为空）"
+        print(f"[DEBUG] 登录信息长度: {len(login_info)} 字符")
         return login_info
         
-    except (paramiko.SSHException, socket.error, Exception) as e:
-        # SSH连接失败，记录错误但不影响占用流程
-        print(f"获取登录信息失败: {str(e)}")
-        return f"获取登录信息失败: {str(e)}"
+    except paramiko.AuthenticationException as e:
+        error_msg = f"SSH认证失败 (用户名或密码错误): {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
+    except socket.timeout as e:
+        error_msg = f"SSH连接超时 (无法连接到 {host}:{port}): {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
+    except (paramiko.SSHException, socket.error) as e:
+        error_msg = f"SSH连接失败: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
+    except Exception as e:
+        error_msg = f"获取登录信息时发生错误: {type(e).__name__}: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
 
 @app.route('/api/devices/<int:device_id>/occupy', methods=['POST'])
 def occupy_device(device_id):
@@ -800,6 +819,11 @@ def occupy_device(device_id):
     
     # 获取Linux登录信息
     login_info = get_linux_login_info(device)
+    
+    # 记录日志以便调试
+    print(f"[DEBUG] 占用设备 {device.name} (ID: {device_id})")
+    print(f"[DEBUG] SSH配置: {device.ssh_connections[:100] if device.ssh_connections else 'None'}...")
+    print(f"[DEBUG] 登录信息获取结果: {login_info[:200] if login_info else 'None'}...")
     
     # 更新设备状态
     device.status = 'occupied'
