@@ -12,7 +12,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 from flask import Flask
-from models import db, User, Device, UsageRecord, AllowedUser, AuditLog
+from models import db, User, Device, UsageRecord, AllowedUser, AuditLog, QuickCommand
 import json
 
 # 读取配置
@@ -69,7 +69,7 @@ with app.app_context():
     print()
     
     # 4. 检查必需的表
-    required_tables = ['devices', 'users', 'usage_records', 'allowed_users', 'audit_logs']
+    required_tables = ['devices', 'users', 'usage_records', 'allowed_users', 'audit_logs', 'quick_commands']
     missing_tables = [t for t in required_tables if t not in table_names]
     
     if missing_tables:

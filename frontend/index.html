@@ -1920,6 +1920,7 @@
                         <button class="nav-btn" :class="{active: currentView === 'devices'}" @click="currentView = 'devices'">设备列表</button>
                         <button class="nav-btn" :class="{active: currentView === 'records'}" @click="currentView = 'records'">使用记录</button>
                         <button class="nav-btn" :class="{active: currentView === 'users'}" @click="currentView = 'users'" v-if="isLoggedIn && currentUser.is_admin">用户管理</button>
+                        <button class="nav-btn" :class="{active: currentView === 'quick-commands'}" @click="currentView = 'quick-commands'" v-if="isLoggedIn && currentUser.is_admin">快捷命令</button>
                         <button class="nav-btn" :class="{active: currentView === 'audit-logs'}" @click="currentView = 'audit-logs'" v-if="isLoggedIn && currentUser.is_admin">审计日志</button>
                         <button class="nav-btn" :class="{active: currentView === 'statistics'}" @click="currentView = 'statistics'">统计报表</button>
                     </div>
@@ -2379,6 +2380,61 @@
                 </div>
             </div>
 
+            <!-- 快捷命令管理页面 -->
+            <div class="content" v-if="currentView === 'quick-commands' && isLoggedIn && currentUser.is_admin">
+                <div class="section-header">
+                    <h2>⚡ 快捷命令管理</h2>
+                    <div style="display: flex; gap: 10px;">
+                        <span style="color: #666; font-size: 14px; align-self: center;">最多创建5个快捷命令</span>
+                        <button class="btn btn-primary" @click="openQuickCommandModal()" :disabled="quickCommandsList.length >= 5">
+                            ➕ 添加快捷命令
+                        </button>
+                    </div>
+                </div>
+
+                <div v-if="quickCommandsList.length === 0" class="empty-state">
+                    <div class="empty-state-icon">⚡</div>
+                    <p>暂无快捷命令</p>
+                    <p style="color: #999; font-size: 14px;">快捷命令会显示在SSH终端窗口中，点击即可快速执行</p>
+                </div>
+
+                <div v-else style="background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">排序</th>
+                                <th style="width: 150px;">按钮名称</th>
+                                <th>命令内容</th>
+                                <th style="width: 200px;">描述</th>
+                                <th style="width: 80px;">状态</th>
+                                <th style="width: 180px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="cmd in quickCommandsList" :key="cmd.id">
+                                <td>{{ cmd.order }}</td>
+                                <td><strong>{{ cmd.name }}</strong></td>
+                                <td><code style="font-size: 12px;">{{ cmd.command }}</code></td>
+                                <td>{{ cmd.description || '-' }}</td>
+                                <td>
+                                    <span :class="cmd.enabled ? 'status-badge available' : 'status-badge occupied'">
+                                        {{ cmd.enabled ? '启用' : '禁用' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-secondary" @click="openQuickCommandModal(cmd)" style="padding: 6px 12px; font-size: 12px;">
+                                        ✏️ 编辑
+                                    </button>
+                                    <button class="btn btn-danger" @click="deleteQuickCommand(cmd.id)" style="padding: 6px 12px; font-size: 12px; margin-left: 5px;">
+                                        🗑️ 删除
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- 审计日志页面 -->
             <div class="content" v-if="currentView === 'audit-logs' && isLoggedIn && currentUser.is_admin">
                 <div class="section-header">
@@ -2639,12 +2695,13 @@
                 <!-- 快捷命令按钮区域 -->
                 <div class="terminal-quick-commands">
                     <button 
-                        v-for="(cmd, index) in quickCommands" 
+                        v-for="(cmd, index) in allQuickCommands" 
                         :key="index"
                         class="quick-cmd-btn"
                         @click="executeQuickCommand(cmd.command)"
-                        @contextmenu.prevent="editQuickCommand(index)"
-                        :title="'命令: ' + cmd.command + '\n右键编辑'"
+                        @contextmenu.prevent="cmd.isAdmin ? null : editQuickCommand(index)"
+                        :title="cmd.isAdmin ? ('管理员命令: ' + cmd.command + '\n' + (cmd.description || '')) : ('命令: ' + cmd.command + '\n右键编辑')"
+                        :style="cmd.isAdmin ? 'border-left: 3px solid #667eea;' : ''"
                     >
                         {{ cmd.label }}
                     </button>
@@ -2676,7 +2733,50 @@
             </div>
         </div>
 
-        <!-- 编辑快捷命令弹窗 -->
+        <!-- 快捷命令管理弹窗 -->
+        <div v-if="showQuickCommandModal" class="modal-overlay">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3>{{ quickCommandForm.id ? '✏️ 编辑快捷命令' : '➕ 添加快捷命令' }}</h3>
+                    <button class="close-btn" @click="closeQuickCommandModal">×</button>
+                </div>
+                <div class="modal-body">
+                    <form @submit.prevent="saveAdminQuickCommand">
+                        <div class="form-group">
+                            <label>按钮名称 *</label>
+                            <input v-model="quickCommandForm.name" type="text" placeholder="例如: 查看目录" required maxlength="20">
+                            <small style="color: #999;">最多20个字符，将显示在SSH终端的按钮上</small>
+                        </div>
+                        <div class="form-group">
+                            <label>命令内容 *</label>
+                            <textarea v-model="quickCommandForm.command" placeholder="例如: ls -la" required rows="4" style="font-family: monospace;"></textarea>
+                            <small style="color: #999;">支持多行命令，每行一个命令</small>
+                        </div>
+                        <div class="form-group">
+                            <label>命令描述</label>
+                            <input v-model="quickCommandForm.description" type="text" placeholder="例如: 列出当前目录所有文件" maxlength="200">
+                        </div>
+                        <div class="form-group">
+                            <label>排序顺序</label>
+                            <input v-model.number="quickCommandForm.order" type="number" min="0" max="100" placeholder="0">
+                            <small style="color: #999;">数字越小越靠前</small>
+                        </div>
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" v-model="quickCommandForm.enabled" style="width: auto; margin-right: 8px;">
+                                启用此命令
+                            </label>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">{{ quickCommandForm.id ? '保存' : '创建' }}</button>
+                            <button type="button" class="btn btn-secondary" @click="closeQuickCommandModal">取消</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 编辑快捷命令弹窗（旧版，用于内联编辑，保留兼容） -->
         <div v-if="showEditQuickCommand" class="modal-overlay">
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
@@ -2856,7 +2956,7 @@
                         content: ''
                     },
                     
-                    // 终端快捷按钮配置
+                    // 终端快捷按钮配置（内置的10个命令，用户可编辑）
                     quickCommands: [
                         { label: 'ls -la', command: 'ls -la\n' },
                         { label: 'pwd', command: 'pwd\n' },
@@ -2869,6 +2969,23 @@
                         { label: 'clear', command: 'clear\n' },
                         { label: 'exit', command: 'exit\n' }
                     ],
+                    
+                    // 管理员自定义的快捷命令（从数据库加载，最多5个）
+                    adminQuickCommands: [],
+                    
+                    // 快捷命令管理（管理界面）
+                    quickCommandsList: [],
+                    showQuickCommandModal: false,
+                    quickCommandForm: {
+                        id: null,
+                        name: '',
+                        command: '',
+                        description: '',
+                        order: 0,
+                        enabled: true
+                    },
+                    
+                    // 旧版编辑功能（用于编辑内置的10个命令）
                     showEditQuickCommand: false,
                     editingCommandIndex: null,
                     editCommandForm: {
@@ -2928,6 +3045,12 @@
                 };
             },
             computed: {
+                // 合并内置命令和管理员自定义命令
+                allQuickCommands() {
+                    // 先显示内置的10个命令，然后追加管理员配置的命令
+                    return [...this.quickCommands, ...this.adminQuickCommands];
+                },
+                
                 filteredDevices() {
                     let filtered = this.devices;
                     
@@ -3049,18 +3172,19 @@
                 // 加载系统配置
                 this.loadSystemConfig();
                 
-                // 加载保存的快捷命令
+                // 加载保存的内置快捷命令（用户自己编辑的）
                 const savedCommands = localStorage.getItem('quickCommands');
                 if (savedCommands) {
                     try {
                         this.quickCommands = JSON.parse(savedCommands);
-                        console.log('已加载保存的快捷命令:', this.quickCommands);
+                        console.log('已加载保存的快捷命令:', this.quickCommands.length);
                     } catch (e) {
                         console.error('加载快捷命令失败:', e);
                     }
-                } else {
-                    console.log('使用默认快捷命令:', this.quickCommands);
                 }
+                
+                // 加载管理员配置的快捷命令（从数据库）
+                this.loadQuickCommands();
 
                 // 检查是否已登录
                 const token = localStorage.getItem('token');
@@ -3097,6 +3221,10 @@
                     // 切换到审计日志时加载数据
                     if (newView === 'audit-logs') {
                         this.loadAuditLogs(1);
+                    }
+                    // 切换到快捷命令管理时加载数据
+                    if (newView === 'quick-commands') {
+                        this.loadAllQuickCommands();
                     }
                 }
             },
@@ -3475,8 +3603,127 @@
                     }
                 },
                 
-                // ==================== 审计日志相关方法 ====================
+                // ==================== 快捷命令管理相关方法 ====================
                 
+                async loadQuickCommands() {
+                    /**
+                     * 加载管理员配置的快捷命令（追加到内置命令后）
+                     */
+                    try {
+                        const response = await axios.get(`${this.apiBaseUrl}/quick-commands`);
+                        // 转换格式并保存到单独的数组
+                        this.adminQuickCommands = response.data.commands.map(cmd => ({
+                            id: cmd.id,
+                            label: cmd.name,
+                            command: cmd.command.endsWith('\n') ? cmd.command : cmd.command + '\n',
+                            description: cmd.description,
+                            isAdmin: true // 标记为管理员命令
+                        }));
+                        console.log('加载管理员快捷命令成功:', this.adminQuickCommands.length);
+                    } catch (error) {
+                        console.error('加载管理员快捷命令失败:', error);
+                    }
+                },
+                
+                async loadAllQuickCommands() {
+                    /**
+                     * 加载所有快捷命令（用于管理界面）
+                     */
+                    try {
+                        const response = await axios.get(`${this.apiBaseUrl}/quick-commands/all`, {
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        this.quickCommandsList = response.data.commands;
+                    } catch (error) {
+                        console.error('加载快捷命令列表失败:', error);
+                        this.showMessage('加载失败', '快捷命令列表加载失败', 'error');
+                    }
+                },
+                
+                openQuickCommandModal(command = null) {
+                    /**
+                     * 打开快捷命令编辑/新建弹窗
+                     */
+                    if (command) {
+                        // 编辑模式
+                        this.quickCommandForm = { ...command };
+                    } else {
+                        // 新建模式
+                        this.quickCommandForm = {
+                            id: null,
+                            name: '',
+                            command: '',
+                            description: '',
+                            order: this.quickCommandsList.length,
+                            enabled: true
+                        };
+                    }
+                    this.showQuickCommandModal = true;
+                },
+                
+                closeQuickCommandModal() {
+                    this.showQuickCommandModal = false;
+                    this.quickCommandForm = {
+                        id: null,
+                        name: '',
+                        command: '',
+                        description: '',
+                        order: 0,
+                        enabled: true
+                    };
+                },
+                
+                async saveAdminQuickCommand() {
+                    /**
+                     * 保存管理员快捷命令（新建或更新）
+                     */
+                    try {
+                        if (this.quickCommandForm.id) {
+                            // 更新
+                            await axios.put(
+                                `${this.apiBaseUrl}/quick-commands/${this.quickCommandForm.id}`,
+                                this.quickCommandForm,
+                                { headers: { 'Authorization': `Bearer ${this.token}` } }
+                            );
+                            this.showMessage('更新成功', '快捷命令已更新', 'success');
+                        } else {
+                            // 新建
+                            await axios.post(
+                                `${this.apiBaseUrl}/quick-commands`,
+                                this.quickCommandForm,
+                                { headers: { 'Authorization': `Bearer ${this.token}` } }
+                            );
+                            this.showMessage('创建成功', '快捷命令已创建', 'success');
+                        }
+                        this.closeQuickCommandModal();
+                        await this.loadAllQuickCommands();
+                        await this.loadQuickCommands(); // 同时更新终端使用的命令列表
+                    } catch (error) {
+                        this.showMessage('保存失败', error.response?.data?.message || '保存快捷命令失败', 'error');
+                    }
+                },
+                
+                async deleteQuickCommand(commandId) {
+                    /**
+                     * 删除快捷命令
+                     */
+                    if (!confirm('确定要删除这个快捷命令吗？')) {
+                        return;
+                    }
+                    
+                    try {
+                        await axios.delete(
+                            `${this.apiBaseUrl}/quick-commands/${commandId}`,
+                            { headers: { 'Authorization': `Bearer ${this.token}` } }
+                        );
+                        this.showMessage('删除成功', '快捷命令已删除', 'success');
+                        await this.loadAllQuickCommands();
+                        await this.loadQuickCommands(); // 同时更新终端使用的命令列表
+                    } catch (error) {
+                        this.showMessage('删除失败', error.response?.data?.message || '删除快捷命令失败', 'error');
+                    }
+                },
+
                 async loadAuditLogs(page = 1) {
                     try {
                         const params = {

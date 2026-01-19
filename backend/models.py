@@ -92,3 +92,32 @@ class AuditLog(db.Model):
     
     def __repr__(self):
         return f'<AuditLog {self.id} - {self.action_type}>'
+
+class QuickCommand(db.Model):
+    """快捷命令模型 - 用于SSH终端的自定义快捷按钮"""
+    __tablename__ = 'quick_commands'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)  # 按钮显示名称
+    command = db.Column(db.Text, nullable=False)  # 要执行的命令
+    description = db.Column(db.String(200))  # 命令描述（可选）
+    order = db.Column(db.Integer, default=0)  # 排序顺序（数字越小越靠前）
+    enabled = db.Column(db.Boolean, default=True)  # 是否启用
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'command': self.command,
+            'description': self.description,
+            'order': self.order,
+            'enabled': self.enabled,
+            'created_at': self.created_at.strftime('%Y-%m-%d %H:%M:%S') if self.created_at else None,
+            'updated_at': self.updated_at.strftime('%Y-%m-%d %H:%M:%S') if self.updated_at else None
+        }
+    
+    def __repr__(self):
+        return f'<QuickCommand {self.id} - {self.name}>'

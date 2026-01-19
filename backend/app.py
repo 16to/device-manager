@@ -97,7 +97,7 @@ except Exception as e:
     sys.exit(1)
 
 # 在数据库初始化后导入模型类（重要！确保模型能被正确注册）
-from models import Device, User, UsageRecord, AllowedUser, AuditLog
+from models import Device, User, UsageRecord, AllowedUser, AuditLog, QuickCommand
 
 # 创建数据库表
 print(f"创建数据库表...")
@@ -1219,6 +1219,125 @@ def batch_import_users():
         'fail_count': fail_count,
         'errors': error_messages[:10]  # 只返回前10条错误信息
     })
+
+# ==================== 快捷命令管理 ====================
+
+@app.route('/api/quick-commands', methods=['GET'])
+def get_quick_commands():
+    """获取所有启用的快捷命令（所有用户可访问）"""
+    try:
+        commands = QuickCommand.query.filter_by(enabled=True).order_by(QuickCommand.order, QuickCommand.id).all()
+        return jsonify({
+            'commands': [cmd.to_dict() for cmd in commands]
+        })
+    except Exception as e:
+        return jsonify({'message': f'获取快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands/all', methods=['GET'])
+def get_all_quick_commands():
+    """获取所有快捷命令（包括未启用的，仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        commands = QuickCommand.query.order_by(QuickCommand.order, QuickCommand.id).all()
+        return jsonify({
+            'commands': [cmd.to_dict() for cmd in commands]
+        })
+    except Exception as e:
+        return jsonify({'message': f'获取快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands', methods=['POST'])
+def create_quick_command():
+    """创建快捷命令（仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        data = request.json
+        
+        # 检查是否已经有5个命令
+        count = QuickCommand.query.count()
+        if count >= 5:
+            return jsonify({'message': '最多只能创建5个快捷命令'}), 400
+        
+        # 验证必填字段
+        if not data.get('name') or not data.get('command'):
+            return jsonify({'message': '名称和命令不能为空'}), 400
+        
+        command = QuickCommand(
+            name=data.get('name'),
+            command=data.get('command'),
+            description=data.get('description', ''),
+            order=data.get('order', count),
+            enabled=data.get('enabled', True)
+        )
+        
+        db.session.add(command)
+        db.session.commit()
+        
+        return jsonify({
+            'message': '快捷命令创建成功',
+            'command': command.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'创建快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands/<int:command_id>', methods=['PUT'])
+def update_quick_command(command_id):
+    """更新快捷命令（仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        command = QuickCommand.query.get_or_404(command_id)
+        data = request.json
+        
+        # 验证必填字段
+        if not data.get('name') or not data.get('command'):
+            return jsonify({'message': '名称和命令不能为空'}), 400
+        
+        command.name = data.get('name')
+        command.command = data.get('command')
+        command.description = data.get('description', '')
+        command.order = data.get('order', command.order)
+        command.enabled = data.get('enabled', True)
+        command.updated_at = datetime.now()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': '快捷命令更新成功',
+            'command': command.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'更新快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands/<int:command_id>', methods=['DELETE'])
+def delete_quick_command(command_id):
+    """删除快捷命令（仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        command = QuickCommand.query.get_or_404(command_id)
+        db.session.delete(command)
+        db.session.commit()
+        
+        return jsonify({'message': '快捷命令删除成功'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'删除快捷命令失败: {str(e)}'}), 500
 
 # ==================== 健康检查 ====================
 
