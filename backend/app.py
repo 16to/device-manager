@@ -97,7 +97,7 @@ except Exception as e:
     sys.exit(1)
 
 # 在数据库初始化后导入模型类（重要！确保模型能被正确注册）
-from models import Device, User, UsageRecord, AllowedUser, AuditLog
+from models import Device, User, UsageRecord, AllowedUser, AuditLog, QuickCommand
 
 # 创建数据库表
 print(f"创建数据库表...")
@@ -689,14 +689,14 @@ def get_linux_login_info(device):
     import paramiko
     import socket
     
-    # 如果设备没有配置SSH连接信息，返回空
+    # 如果设备没有配置SSH连接信息，返回提示信息
     if not device.ssh_connections:
-        return None
+        return "该设备未配置SSH连接信息，无法获取登录信息"
     
     try:
         ssh_connections = json.loads(device.ssh_connections)
         if not ssh_connections:
-            return None
+            return "该设备未配置SSH连接信息，无法获取登录信息"
         
         # 使用第一个SSH连接配置
         ssh_conn = ssh_connections[0]
@@ -706,11 +706,13 @@ def get_linux_login_info(device):
         password = device.password
         
         if not all([host, username, password]):
-            return None
+            return f"SSH连接配置不完整 (host={host}, port={port}, username={'已配置' if username else '未配置'}, password={'已配置' if password else '未配置'})"
         
         # 创建SSH客户端
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        
+        print(f"[DEBUG] 尝试SSH连接: {username}@{host}:{port}")
         
         # 连接超时设置为5秒
         ssh.connect(
@@ -722,6 +724,8 @@ def get_linux_login_info(device):
             banner_timeout=5,
             auth_timeout=5
         )
+        
+        print(f"[DEBUG] SSH连接成功，开始获取登录信息")
         
         # 1. 执行who命令获取当前登录用户
         stdin, stdout, stderr = ssh.exec_command('who')
@@ -746,6 +750,8 @@ def get_linux_login_info(device):
         # 关闭连接
         ssh.close()
         
+        print(f"[DEBUG] 成功执行所有命令，组合结果")
+        
         # 组合信息
         login_info_parts = []
         
@@ -764,19 +770,31 @@ def get_linux_login_info(device):
         if lastlog_output:
             login_info_parts.append(f"\n=== 用户最后登录信息 (lastlog) ===\n{lastlog_output}")
         
-        login_info = '\n'.join(login_info_parts) if login_info_parts else "未获取到登录信息"
+        login_info = '\n'.join(login_info_parts) if login_info_parts else "未获取到登录信息（所有命令输出为空）"
+        print(f"[DEBUG] 登录信息长度: {len(login_info)} 字符")
         return login_info
         
-    except (paramiko.SSHException, socket.error, Exception) as e:
-        # SSH连接失败，记录错误但不影响占用流程
-        print(f"获取登录信息失败: {str(e)}")
-        return f"获取登录信息失败: {str(e)}"
+    except paramiko.AuthenticationException as e:
+        error_msg = f"SSH认证失败 (用户名或密码错误): {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
+    except socket.timeout as e:
+        error_msg = f"SSH连接超时 (无法连接到 {host}:{port}): {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
+    except (paramiko.SSHException, socket.error) as e:
+        error_msg = f"SSH连接失败: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
+    except Exception as e:
+        error_msg = f"获取登录信息时发生错误: {type(e).__name__}: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        return error_msg
 
 @app.route('/api/devices/<int:device_id>/occupy', methods=['POST'])
 def occupy_device(device_id):
     """占用设备"""
     from datetime import timedelta
-    import threading
     
     device = Device.query.get_or_404(device_id)
     
@@ -799,6 +817,14 @@ def occupy_device(device_id):
     # 限制时长范围：1-48小时
     duration = max(1, min(48, int(duration)))
     
+    # 获取Linux登录信息
+    login_info = get_linux_login_info(device)
+    
+    # 记录日志以便调试
+    print(f"[DEBUG] 占用设备 {device.name} (ID: {device_id})")
+    print(f"[DEBUG] SSH配置: {device.ssh_connections[:100] if device.ssh_connections else 'None'}...")
+    print(f"[DEBUG] 登录信息获取结果: {login_info[:200] if login_info else 'None'}...")
+    
     # 更新设备状态
     device.status = 'occupied'
     device.current_user = user_name
@@ -806,45 +832,22 @@ def occupy_device(device_id):
     device.occupy_duration = duration
     device.occupy_until = datetime.now() + timedelta(hours=duration)
     
-    # 创建使用记录，登录信息先为空
+    # 创建使用记录
     record = UsageRecord(
         device_id=device_id,
         user_name=user_name,
         user_account=user_account,
         purpose=purpose,
         start_time=datetime.now(),
-        login_info=None  # 先设为空，后台异步获取
+        login_info=login_info
     )
     
     db.session.add(record)
     db.session.commit()
     
-    record_id = record.id
-    
-    # 启动后台线程异步获取登录信息
-    def fetch_login_info_async():
-        try:
-            # 重新创建应用上下文
-            with app.app_context():
-                device_for_fetch = Device.query.get(device_id)
-                if device_for_fetch:
-                    login_info = get_linux_login_info(device_for_fetch)
-                    # 更新使用记录中的登录信息
-                    record_to_update = UsageRecord.query.get(record_id)
-                    if record_to_update:
-                        record_to_update.login_info = login_info
-                        db.session.commit()
-                        print(f"✅ 已异步更新设备 {device_id} 的登录信息")
-        except Exception as e:
-            print(f"❌ 异步获取登录信息失败: {e}")
-    
-    # 启动后台线程
-    thread = threading.Thread(target=fetch_login_info_async, daemon=True)
-    thread.start()
-    
     return jsonify({
         'message': '设备占用成功',
-        'record_id': record_id,
+        'record_id': record.id,
         'occupy_until': device.occupy_until.strftime('%Y-%m-%d %H:%M:%S')
     })
 
@@ -1216,6 +1219,125 @@ def batch_import_users():
         'fail_count': fail_count,
         'errors': error_messages[:10]  # 只返回前10条错误信息
     })
+
+# ==================== 快捷命令管理 ====================
+
+@app.route('/api/quick-commands', methods=['GET'])
+def get_quick_commands():
+    """获取所有启用的快捷命令（所有用户可访问）"""
+    try:
+        commands = QuickCommand.query.filter_by(enabled=True).order_by(QuickCommand.order, QuickCommand.id).all()
+        return jsonify({
+            'commands': [cmd.to_dict() for cmd in commands]
+        })
+    except Exception as e:
+        return jsonify({'message': f'获取快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands/all', methods=['GET'])
+def get_all_quick_commands():
+    """获取所有快捷命令（包括未启用的，仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        commands = QuickCommand.query.order_by(QuickCommand.order, QuickCommand.id).all()
+        return jsonify({
+            'commands': [cmd.to_dict() for cmd in commands]
+        })
+    except Exception as e:
+        return jsonify({'message': f'获取快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands', methods=['POST'])
+def create_quick_command():
+    """创建快捷命令（仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        data = request.json
+        
+        # 检查是否已经有5个命令
+        count = QuickCommand.query.count()
+        if count >= 5:
+            return jsonify({'message': '最多只能创建5个快捷命令'}), 400
+        
+        # 验证必填字段
+        if not data.get('name') or not data.get('command'):
+            return jsonify({'message': '名称和命令不能为空'}), 400
+        
+        command = QuickCommand(
+            name=data.get('name'),
+            command=data.get('command'),
+            description=data.get('description', ''),
+            order=data.get('order', count),
+            enabled=data.get('enabled', True)
+        )
+        
+        db.session.add(command)
+        db.session.commit()
+        
+        return jsonify({
+            'message': '快捷命令创建成功',
+            'command': command.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'创建快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands/<int:command_id>', methods=['PUT'])
+def update_quick_command(command_id):
+    """更新快捷命令（仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        command = QuickCommand.query.get_or_404(command_id)
+        data = request.json
+        
+        # 验证必填字段
+        if not data.get('name') or not data.get('command'):
+            return jsonify({'message': '名称和命令不能为空'}), 400
+        
+        command.name = data.get('name')
+        command.command = data.get('command')
+        command.description = data.get('description', '')
+        command.order = data.get('order', command.order)
+        command.enabled = data.get('enabled', True)
+        command.updated_at = datetime.now()
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': '快捷命令更新成功',
+            'command': command.to_dict()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'更新快捷命令失败: {str(e)}'}), 500
+
+@app.route('/api/quick-commands/<int:command_id>', methods=['DELETE'])
+def delete_quick_command(command_id):
+    """删除快捷命令（仅管理员）"""
+    # 验证token（简化版本）
+    token = request.headers.get('Authorization', '').replace('Bearer ', '')
+    if not token:
+        return jsonify({'message': '未授权'}), 401
+    
+    try:
+        command = QuickCommand.query.get_or_404(command_id)
+        db.session.delete(command)
+        db.session.commit()
+        
+        return jsonify({'message': '快捷命令删除成功'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'message': f'删除快捷命令失败: {str(e)}'}), 500
 
 # ==================== 健康检查 ====================
 

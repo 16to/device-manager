@@ -18,7 +18,7 @@ from datetime import datetime
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'backend'))
 
 from flask import Flask
-from models import db, User, Device, UsageRecord, AllowedUser, AuditLog
+from models import db, User, Device, UsageRecord, AllowedUser, AuditLog, QuickCommand
 from sqlalchemy import inspect, text
 
 # 读取配置
@@ -119,7 +119,8 @@ with app.app_context():
         'devices': Device,
         'usage_records': UsageRecord,
         'allowed_users': AllowedUser,
-        'audit_logs': AuditLog
+        'audit_logs': AuditLog,
+        'quick_commands': QuickCommand
     }
     
     # 检查数据库是否存在
