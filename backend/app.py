@@ -776,6 +776,7 @@ def get_linux_login_info(device):
 def occupy_device(device_id):
     """占用设备"""
     from datetime import timedelta
+    import threading
     
     device = Device.query.get_or_404(device_id)
     
@@ -798,9 +799,6 @@ def occupy_device(device_id):
     # 限制时长范围：1-48小时
     duration = max(1, min(48, int(duration)))
     
-    # 获取Linux登录信息
-    login_info = get_linux_login_info(device)
-    
     # 更新设备状态
     device.status = 'occupied'
     device.current_user = user_name
@@ -808,22 +806,45 @@ def occupy_device(device_id):
     device.occupy_duration = duration
     device.occupy_until = datetime.now() + timedelta(hours=duration)
     
-    # 创建使用记录
+    # 创建使用记录，登录信息先为空
     record = UsageRecord(
         device_id=device_id,
         user_name=user_name,
         user_account=user_account,
         purpose=purpose,
         start_time=datetime.now(),
-        login_info=login_info
+        login_info=None  # 先设为空，后台异步获取
     )
     
     db.session.add(record)
     db.session.commit()
     
+    record_id = record.id
+    
+    # 启动后台线程异步获取登录信息
+    def fetch_login_info_async():
+        try:
+            # 重新创建应用上下文
+            with app.app_context():
+                device_for_fetch = Device.query.get(device_id)
+                if device_for_fetch:
+                    login_info = get_linux_login_info(device_for_fetch)
+                    # 更新使用记录中的登录信息
+                    record_to_update = UsageRecord.query.get(record_id)
+                    if record_to_update:
+                        record_to_update.login_info = login_info
+                        db.session.commit()
+                        print(f"✅ 已异步更新设备 {device_id} 的登录信息")
+        except Exception as e:
+            print(f"❌ 异步获取登录信息失败: {e}")
+    
+    # 启动后台线程
+    thread = threading.Thread(target=fetch_login_info_async, daemon=True)
+    thread.start()
+    
     return jsonify({
         'message': '设备占用成功',
-        'record_id': record.id,
+        'record_id': record_id,
         'occupy_until': device.occupy_until.strftime('%Y-%m-%d %H:%M:%S')
     })
 
