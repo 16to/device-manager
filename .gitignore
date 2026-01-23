@@ -46,3 +46,7 @@ Thumbs.db
 *.tmp
 *.bak
 *.orig
+
+# Database files (local data, should not be versioned)
+backend/device_manager.db
+*.db
