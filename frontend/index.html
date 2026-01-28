@@ -2421,8 +2421,8 @@
                 <div class="section-header">
                     <h2>⚡ 快捷命令管理</h2>
                     <div style="display: flex; gap: 10px;">
-                        <span style="color: #666; font-size: 14px; align-self: center;">最多创建5个快捷命令</span>
-                        <button class="btn btn-primary" @click="openQuickCommandModal()" :disabled="quickCommandsList.length >= 5">
+                        <span style="color: #666; font-size: 14px; align-self: center;">最多创建10个快捷命令</span>
+                        <button class="btn btn-primary" @click="openQuickCommandModal()" :disabled="quickCommandsList.length >= 10">
                             ➕ 添加快捷命令
                         </button>
                     </div>
@@ -3014,7 +3014,7 @@
                         { label: 'exit', command: 'exit\n' }
                     ],
                     
-                    // 管理员自定义的快捷命令（从数据库加载，最多5个）
+                    // 管理员自定义的快捷命令（从数据库加载，最多10个）
                     adminQuickCommands: [],
                     
                     // 快捷命令管理（管理界面）

@@ -1307,10 +1307,10 @@ def create_quick_command():
     try:
         data = request.json
         
-        # 检查是否已经有5个命令
+        # 检查是否已经有10个命令
         count = QuickCommand.query.count()
-        if count >= 5:
-            return jsonify({'message': '最多只能创建5个快捷命令'}), 400
+        if count >= 10:
+            return jsonify({'message': '最多只能创建10个快捷命令'}), 400
         
         # 验证必填字段
         if not data.get('name') or not data.get('command'):
