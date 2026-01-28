@@ -828,6 +828,7 @@ def get_linux_login_info(device):
 def occupy_device(device_id):
     """占用设备"""
     from datetime import timedelta
+    import threading
     
     device = Device.query.get_or_404(device_id)
     
@@ -864,13 +865,9 @@ def occupy_device(device_id):
     # 限制时长范围：1-48小时
     duration = max(1, min(48, int(duration)))
     
-    # 获取Linux登录信息
-    login_info = get_linux_login_info(device)
-    
     # 记录日志以便调试
     print(f"[DEBUG] 占用设备 {device.name} (ID: {device_id})")
     print(f"[DEBUG] SSH配置: {device.ssh_connections[:100] if device.ssh_connections else 'None'}...")
-    print(f"[DEBUG] 登录信息获取结果: {login_info[:200] if login_info else 'None'}...")
     
     # 更新设备状态
     device.status = 'occupied'
@@ -879,18 +876,53 @@ def occupy_device(device_id):
     device.occupy_duration = duration
     device.occupy_until = datetime.now() + timedelta(hours=duration)
     
-    # 创建使用记录
+    # 创建使用记录（先不设置登录信息）
     record = UsageRecord(
         device_id=device_id,
         user_name=user_name,
         user_account=user_account,
         purpose=purpose,
         start_time=datetime.now(),
-        login_info=login_info
+        login_info='正在后台获取登录信息...'
     )
     
     db.session.add(record)
     db.session.commit()
+    
+    record_id = record.id
+    
+    # 异步获取登录信息
+    def fetch_login_info_async():
+        """后台异步获取登录信息"""
+        with app.app_context():
+            try:
+                print(f"[DEBUG] 开始异步获取设备 {device_id} 的登录信息")
+                login_info = get_linux_login_info(device)
+                print(f"[DEBUG] 登录信息获取结果: {login_info[:200] if login_info else 'None'}...")
+                
+                # 更新使用记录
+                record = UsageRecord.query.get(record_id)
+                if record:
+                    record.login_info = login_info
+                    db.session.commit()
+                    print(f"[DEBUG] 登录信息已更新到记录 {record_id}")
+                else:
+                    print(f"[WARN] 未找到记录 {record_id}")
+            except Exception as e:
+                print(f"[ERROR] 异步获取登录信息失败: {type(e).__name__}: {str(e)}")
+                # 更新为错误信息
+                try:
+                    record = UsageRecord.query.get(record_id)
+                    if record:
+                        record.login_info = f"获取登录信息失败: {str(e)}"
+                        db.session.commit()
+                except Exception as e2:
+                    print(f"[ERROR] 更新错误信息失败: {e2}")
+    
+    # 启动后台线程获取登录信息
+    thread = threading.Thread(target=fetch_login_info_async)
+    thread.daemon = True
+    thread.start()
     
     return jsonify({
         'message': '设备占用成功',
