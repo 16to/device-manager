@@ -433,9 +433,17 @@ EOF
 
 # 启动服务
 start_service() {
-    log_step "启动服务..."
+    log_step "启动/重启服务..."
     
-    $USE_SUDO systemctl start device-manager
+    # 如果服务正在运行，先停止它
+    if $USE_SUDO systemctl is-active --quiet device-manager; then
+        log_info "服务正在运行，准备重启..."
+        $USE_SUDO systemctl restart device-manager
+    else
+        log_info "启动新服务..."
+        $USE_SUDO systemctl start device-manager
+    fi
+    
     sleep 5
     
     if $USE_SUDO systemctl is-active --quiet device-manager; then
