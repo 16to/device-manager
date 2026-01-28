@@ -17,6 +17,9 @@
   "user": {
     "default_password": "123456"
   },
+  "device": {
+    "max_devices_per_user": 1
+  },
   "socketio": {
     "ping_timeout": 120,
     "ping_interval": 25,

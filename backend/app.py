@@ -27,6 +27,7 @@ DEFAULT_CONFIG = {
     "admin": {"username": "admin", "password": "admin123"},
     "database": {"path": "backend/device_manager.db"},
     "user": {"default_password": "123456"},
+    "device": {"max_devices_per_user": 1},  # 每个用户最多占用的设备数量
     "socketio": {"ping_timeout": 120, "ping_interval": 25, "max_http_buffer_size": 1073741824},
     "system": {"title": "设备使用管理系统"}  # 系统标题配置
 }
@@ -284,6 +285,9 @@ def get_config():
         'default_password': CONFIG['user']['default_password'],
         'system': {
             'title': CONFIG.get('system', {}).get('title', '设备使用管理系统')  # 获取系统标题，如果未配置则使用默认值
+        },
+        'device': {
+            'max_devices_per_user': CONFIG.get('device', {}).get('max_devices_per_user', 1)  # 获取每个用户最多占用设备数量
         }
     })
 
@@ -309,6 +313,35 @@ def update_system_title():
         return jsonify({
             'message': '系统标题已更新',
             'title': new_title
+        })
+    except Exception as e:
+        return jsonify({'message': f'保存配置失败: {str(e)}'}), 500
+
+@app.route('/api/config/device/limit', methods=['PUT'])
+def update_device_limit():
+    """更新每个用户最多占用设备数量"""
+    data = request.json
+    if not data or 'max_devices_per_user' not in data:
+        return jsonify({'message': '参数错误'}), 400
+    
+    try:
+        max_devices = int(data['max_devices_per_user'])
+        if max_devices < 1:
+            return jsonify({'message': '设备数量必须大于等于1'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'message': '设备数量必须是有效的整数'}), 400
+    
+    # 更新内存中的配置
+    CONFIG.setdefault('device', {})
+    CONFIG['device']['max_devices_per_user'] = max_devices
+    
+    # 保存到配置文件
+    try:
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(CONFIG, f, ensure_ascii=False, indent=2)
+        return jsonify({
+            'message': f'设备数量限制已更新为 {max_devices}',
+            'max_devices_per_user': max_devices
         })
     except Exception as e:
         return jsonify({'message': f'保存配置失败: {str(e)}'}), 500
@@ -813,6 +846,20 @@ def occupy_device(device_id):
     
     # 使用中文名作为显示名称
     user_name = allowed_user.chinese_name
+    
+    # 检查用户当前占用的设备数量
+    max_devices = CONFIG.get('device', {}).get('max_devices_per_user', 1)
+    current_occupied = Device.query.filter_by(
+        current_user_account=user_account,
+        status='occupied'
+    ).count()
+    
+    if current_occupied >= max_devices:
+        return jsonify({
+            'message': f'您已占用 {current_occupied} 台设备，达到最大限制 {max_devices} 台。请先释放其他设备后再占用。',
+            'current_occupied': current_occupied,
+            'max_devices': max_devices
+        }), 403
     
     # 限制时长范围：1-48小时
     duration = max(1, min(48, int(duration)))

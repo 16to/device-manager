@@ -1931,6 +1931,13 @@
                             title="编辑系统名称">
                         <span style="margin-right: 3px;">✏️</span>编辑
                     </button>
+                    <button v-if="isLoggedIn && currentUser.is_admin"
+                            @click="editDeviceLimit"
+                            class="btn btn-secondary"
+                            style="padding: 4px 10px; font-size: 12px; min-width: 100px; border-radius: 4px;"
+                            :title="'设备数量限制 (当前: ' + maxDevicesPerUser + '台/人)'">
+                        <span style="margin-right: 3px;">⚙️</span>设备限制: {{ maxDevicesPerUser }}台/人
+                    </button>
                 </div>
                 <div class="header-right">
                     <div class="connection-status" style="padding: 0 12px;">
@@ -2664,6 +2671,13 @@
                     <small style="color: #999; margin-top: 5px; display: block;">
                         {{ (isLoggedIn && !currentUser.is_admin) ? '已自动填充您的账号' : '请输入已授权的账号' }}
                     </small>
+                    <!-- 显示当前占用设备数量和限制 -->
+                    <small v-if="isLoggedIn && !currentUser.is_admin" 
+                           :style="getCurrentOccupiedCount() >= maxDevicesPerUser ? 'color: #f56c6c; font-weight: bold;' : 'color: #67c23a;'"
+                           style="margin-top: 5px; display: block;">
+                        {{ getCurrentOccupiedCount() >= maxDevicesPerUser ? '⚠️ ' : '✓ ' }}
+                        当前已占用 {{ getCurrentOccupiedCount() }}/{{ maxDevicesPerUser }} 台设备
+                    </small>
                 </div>
                 <div class="form-group">
                     <label>占用时长 *</label>
@@ -2869,6 +2883,7 @@
             data() {
                 return {
                     systemTitle: '设备使用管理系统', // 默认标题，从配置中获取
+                    maxDevicesPerUser: 1, // 每个用户最多占用设备数量，从配置中获取
                     isInitialized: false, // 是否已初始化（显示主界面）
                     loginPageMode: 'user', // 登录页模式：'user' 或 'admin'
                     isLoggedIn: false,
@@ -3258,6 +3273,17 @@
                 }
             },
             methods: {
+                // 获取当前用户占用的设备数量
+                getCurrentOccupiedCount() {
+                    if (!this.isLoggedIn || this.currentUser.is_admin) {
+                        return 0;
+                    }
+                    return this.devices.filter(device => 
+                        device.status === 'occupied' && 
+                        device.current_user_account === this.currentUser.username
+                    ).length;
+                },
+                
                 switchLoginMode(mode) {
                     this.loginPageMode = mode;
                     // 切换登录模式时重置密码可见状态
@@ -5215,6 +5241,7 @@
                     try {
                         const response = await axios.get(`${this.apiBaseUrl}/config`);
                         this.systemTitle = response.data.system.title;
+                        this.maxDevicesPerUser = response.data.device.max_devices_per_user;
                         document.title = this.systemTitle;  // 更新浏览器标签页标题
                     } catch (error) {
                         console.error('加载系统配置失败：', error);
@@ -5253,6 +5280,42 @@
                         });
                         this.systemTitle = title;
                         document.title = title;
+                        this.showMessage('更新成功', response.data.message, 'success');
+                    } catch (error) {
+                        this.showMessage('更新失败', error.response?.data?.message || error.message, 'error');
+                    }
+                },
+                
+                // 编辑设备数量限制
+                editDeviceLimit() {
+                    // 检查管理员权限
+                    if (!this.isLoggedIn || !this.currentUser.is_admin) {
+                        this.showMessage('权限不足', '只有管理员才能修改设备数量限制', 'error');
+                        return;
+                    }
+                    
+                    // 弹出输入框
+                    const newLimit = prompt(`请输入每个用户最多可占用的设备数量\n(当前: ${this.maxDevicesPerUser})`, this.maxDevicesPerUser);
+                    if (newLimit === null) return;  // 用户点击取消
+                    
+                    // 验证新限制
+                    const limit = parseInt(newLimit);
+                    if (isNaN(limit) || limit < 1) {
+                        this.showMessage('验证失败', '设备数量必须是大于等于1的整数', 'error');
+                        return;
+                    }
+                    
+                    // 更新限制
+                    this.updateDeviceLimit(limit);
+                },
+                
+                // 更新设备数量限制
+                async updateDeviceLimit(limit) {
+                    try {
+                        const response = await axios.put(`${this.apiBaseUrl}/config/device/limit`, {
+                            max_devices_per_user: limit
+                        });
+                        this.maxDevicesPerUser = limit;
                         this.showMessage('更新成功', response.data.message, 'success');
                     } catch (error) {
                         this.showMessage('更新失败', error.response?.data?.message || error.message, 'error');
